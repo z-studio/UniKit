@@ -193,6 +193,12 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.z-studio.unikit.camera-scaler": {
+      "version": "file:com.z-studio.unikit.camera-scaler",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.z-studio.unikit.ui.safearea": {
       "version": "file:com.z-studio.unikit.ui.safearea",
       "depth": 0,

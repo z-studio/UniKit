@@ -1,0 +1,16 @@
+{
+  "name": "com.z-studio.unikit.camera-scaler",
+  "version": "1.0.0",
+  "displayName": "Camera Scaler",
+  "description": "根据参考分辨率和相机宽高比，自动调整正交相机的可视范围或透视相机的视野角，支持横竖屏及不同屏幕比例适配。启用组件即可在编辑和运行模式下实时生效，禁用或移除时自动恢复原始相机参数。",
+  "unity": "6000.0",
+  "keywords": [
+    "camera",
+    "scaler",
+    "aspect",
+    "fov"
+  ],
+  "author": {
+    "name": "Z Studio"
+  }
+}
