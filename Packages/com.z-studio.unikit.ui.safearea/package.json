@@ -1,0 +1,21 @@
+{
+  "name": "com.z-studio.unikit.ui.safearea",
+  "version": "1.0.0",
+  "displayName": "UI Safe Area",
+  "description": "适用于 Unity 6.0 及以上版本的 uGUI 安全区布局组件。支持容器按指定边缘适配安全区、自定义内边距、居中对齐及参考方向映射；支持子元素外扩或保持尺寸平移，实现向非安全区域延伸的布局，并随窗口尺寸、屏幕方向和安全区变化自动更新。",
+  "unity": "6000.0",
+  "keywords": [
+    "ui",
+    "ugui",
+    "safe area",
+    "notch",
+    "mobile",
+    "layout"
+  ],
+  "author": {
+    "name": "Z Studio"
+  },
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  }
+}

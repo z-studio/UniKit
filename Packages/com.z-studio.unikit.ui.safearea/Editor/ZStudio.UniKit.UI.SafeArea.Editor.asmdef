@@ -1,0 +1,19 @@
+{
+    "name": "ZStudio.UniKit.UI.SafeArea.Editor",
+    "rootNamespace": "ZStudio.UniKit.UI",
+    "references": [
+        "UnityEngine.UI",
+        "ZStudio.UniKit.UI.SafeArea"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

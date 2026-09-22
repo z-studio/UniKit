@@ -1,0 +1,109 @@
+root = true
+
+[*.cs]
+
+# Keep opening braces on the same line as the declaration or statement.
+csharp_new_line_before_open_brace = none
+
+# Target line width for formatters that support it; not a compiler-enforced limit.
+max_line_length = 120
+
+# Types: PlayerController, DamageInfo, PlayerState.
+dotnet_naming_rule.types.symbols = types
+dotnet_naming_rule.types.style = pascal
+dotnet_naming_rule.types.severity = warning
+dotnet_naming_symbols.types.applicable_kinds = class, struct, enum, delegate
+dotnet_naming_symbols.types.applicable_accessibilities = *
+
+# Interfaces: IDamageable.
+dotnet_naming_rule.interfaces.symbols = interfaces
+dotnet_naming_rule.interfaces.style = interface_prefix
+dotnet_naming_rule.interfaces.severity = warning
+dotnet_naming_symbols.interfaces.applicable_kinds = interface
+dotnet_naming_symbols.interfaces.applicable_accessibilities = *
+
+# Namespaces: UniKit.Gameplay.
+dotnet_naming_rule.namespaces.symbols = namespaces
+dotnet_naming_rule.namespaces.style = pascal
+dotnet_naming_rule.namespaces.severity = warning
+dotnet_naming_symbols.namespaces.applicable_kinds = namespace
+dotnet_naming_symbols.namespaces.applicable_accessibilities = *
+
+# Methods, properties and events: TakeDamage, Health, DoorOpened.
+dotnet_naming_rule.members.symbols = members
+dotnet_naming_rule.members.style = pascal
+dotnet_naming_rule.members.severity = warning
+dotnet_naming_symbols.members.applicable_kinds = method, property, event, local_function
+dotnet_naming_symbols.members.applicable_accessibilities = *
+
+# Private constants: k_MaxCount; more specific than private static fields.
+dotnet_naming_rule.private_constants.symbols = private_constants
+dotnet_naming_rule.private_constants.style = constant_prefix
+dotnet_naming_rule.private_constants.severity = warning
+dotnet_naming_symbols.private_constants.applicable_kinds = field
+dotnet_naming_symbols.private_constants.applicable_accessibilities = private
+dotnet_naming_symbols.private_constants.required_modifiers = const
+
+# Non-private constants: MaxCount.
+dotnet_naming_rule.non_private_constants.symbols = non_private_constants
+dotnet_naming_rule.non_private_constants.style = pascal
+dotnet_naming_rule.non_private_constants.severity = warning
+dotnet_naming_symbols.non_private_constants.applicable_kinds = field
+dotnet_naming_symbols.non_private_constants.applicable_accessibilities = public, internal, protected, protected_internal, private_protected
+dotnet_naming_symbols.non_private_constants.required_modifiers = const
+
+# Local constants: k_MaxCount; overrides the local-variable rule.
+dotnet_naming_rule.local_constants.symbols = local_constants
+dotnet_naming_rule.local_constants.style = constant_prefix
+dotnet_naming_rule.local_constants.severity = warning
+dotnet_naming_symbols.local_constants.applicable_kinds = local
+dotnet_naming_symbols.local_constants.applicable_accessibilities = local
+dotnet_naming_symbols.local_constants.required_modifiers = const
+
+# Private static fields, including static readonly: s_Count.
+dotnet_naming_rule.private_static_fields.symbols = private_static_fields
+dotnet_naming_rule.private_static_fields.style = static_prefix
+dotnet_naming_rule.private_static_fields.severity = warning
+dotnet_naming_symbols.private_static_fields.applicable_kinds = field
+dotnet_naming_symbols.private_static_fields.applicable_accessibilities = private
+dotnet_naming_symbols.private_static_fields.required_modifiers = static
+
+# Private instance fields, including readonly/serialized fields: m_Count.
+dotnet_naming_rule.private_fields.symbols = private_fields
+dotnet_naming_rule.private_fields.style = instance_prefix
+dotnet_naming_rule.private_fields.severity = warning
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+
+# Non-private instance/static fields: Count. Constants use their own rule.
+dotnet_naming_rule.non_private_fields.symbols = non_private_fields
+dotnet_naming_rule.non_private_fields.style = pascal
+dotnet_naming_rule.non_private_fields.severity = warning
+dotnet_naming_symbols.non_private_fields.applicable_kinds = field
+dotnet_naming_symbols.non_private_fields.applicable_accessibilities = public, internal, protected, protected_internal, private_protected
+
+# Local variables and parameters: damageAmount.
+dotnet_naming_rule.locals_and_parameters.symbols = locals_and_parameters
+dotnet_naming_rule.locals_and_parameters.style = camel
+dotnet_naming_rule.locals_and_parameters.severity = warning
+dotnet_naming_symbols.locals_and_parameters.applicable_kinds = local, parameter
+dotnet_naming_symbols.locals_and_parameters.applicable_accessibilities = *
+
+# Shared styles: edit these to adjust prefix/capitalization consistently.
+dotnet_naming_style.pascal.required_prefix = 
+dotnet_naming_style.pascal.capitalization = pascal_case
+
+dotnet_naming_style.camel.required_prefix = 
+dotnet_naming_style.camel.capitalization = camel_case
+
+dotnet_naming_style.interface_prefix.required_prefix = I
+dotnet_naming_style.interface_prefix.capitalization = pascal_case
+
+dotnet_naming_style.constant_prefix.required_prefix = k_
+dotnet_naming_style.constant_prefix.capitalization = pascal_case
+
+dotnet_naming_style.static_prefix.required_prefix = s_
+dotnet_naming_style.static_prefix.capitalization = pascal_case
+
+dotnet_naming_style.instance_prefix.required_prefix = m_
+dotnet_naming_style.instance_prefix.capitalization = pascal_case
