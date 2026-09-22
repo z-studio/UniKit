@@ -1,5 +1,29 @@
 {
   "dependencies": {
+    "com.esotericsoftware.spine.spine-csharp": {
+      "version": "file:SpineCsharp",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
+    "com.esotericsoftware.spine.spine-unity": {
+      "version": "file:SpineUnity",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "1.0.0",
+        "com.unity.modules.animation": "1.0.0",
+        "com.unity.modules.physics": "1.0.0",
+        "com.unity.modules.physics2d": "1.0.0",
+        "com.esotericsoftware.spine.spine-csharp": "4.2.0"
+      }
+    },
+    "com.kyrylokuzyk.primetween": {
+      "version": "file:PrimeTween",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.14",
       "depth": 0,
@@ -198,6 +222,14 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {}
+    },
+    "com.z-studio.unikit.ui.marquee": {
+      "version": "file:com.z-studio.unikit.ui.marquee",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0"
+      }
     },
     "com.z-studio.unikit.ui.safearea": {
       "version": "file:com.z-studio.unikit.ui.safearea",

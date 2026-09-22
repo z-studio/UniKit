@@ -1,0 +1,37 @@
+{
+  "name": "com.esotericsoftware.spine.spine-unity",
+  "displayName": "ZStudio.SpineUnity",
+  "description": "This plugin provides the spine-unity runtime core.",
+  "version": "4.2.115",
+  "unity": "6000.0",
+  "author": {
+    "name": "Esoteric Software",
+    "url": "http://esotericsoftware.com/",
+    "email": "contact@esotericsoftware.com"
+  },
+  "dependencies": {
+    "com.unity.ugui": "1.0.0",
+    "com.unity.modules.animation": "1.0.0",
+    "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.physics2d": "1.0.0",
+    "com.esotericsoftware.spine.spine-csharp": "4.2.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:EsotericSoftware/spine-runtimes.git"
+  },
+  "keywords": [
+    "spine",
+    "spine-unity",
+    "runtimes",
+    "2d",
+    "skeletal",
+    "animation"
+  ],
+  "license": "SEE LICENSE IN LICENSE",
+  "bugs": {
+    "url": "https://github.com/EsotericSoftware/spine-runtimes/issues"
+  },
+  "homepage": "https://github.com/EsotericSoftware/spine-runtimes#readme",
+  "_fingerprint": "737be8c465c11a661a49e3934c5d21a2b8d9bd76"
+}

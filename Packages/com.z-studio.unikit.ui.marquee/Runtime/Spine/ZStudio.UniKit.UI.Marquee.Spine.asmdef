@@ -1,0 +1,26 @@
+{
+    "name": "ZStudio.UniKit.UI.Marquee.Spine",
+    "rootNamespace": "ZStudio.UniKit.UI",
+    "references": [
+        "spine-unity",
+        "spine-csharp",
+        "ZStudio.UniKit.UI.Marquee"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UI_MARQUEE_SPINE"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.esotericsoftware.spine.spine-unity",
+            "expression": "",
+            "define": "UI_MARQUEE_SPINE"
+        }
+    ],
+    "noEngineReferences": false
+}
