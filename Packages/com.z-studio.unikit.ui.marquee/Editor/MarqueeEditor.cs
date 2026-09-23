@@ -52,13 +52,21 @@ namespace ZStudio.UniKit.UI.Editor {
         public override void OnInspectorGUI() {
             serializedObject.Update();
 
-            DrawReferences();
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
+                DrawReferences();
+            }
             EditorGUILayout.Space();
-            DrawMode();
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
+                DrawMode();
+            }
             EditorGUILayout.Space();
-            DrawLayoutTiming();
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
+                DrawLayoutTiming();
+            }
             EditorGUILayout.Space();
-            DrawPlayback();
+            using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
+                DrawPlayback();
+            }
             EditorGUILayout.Space();
             DrawItems();
 
@@ -72,57 +80,58 @@ namespace ZStudio.UniKit.UI.Editor {
         }
 
         private void DrawReferences() {
-            EditorGUILayout.LabelField("References", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(m_Viewport);
-            EditorGUILayout.PropertyField(m_ContentTemplate);
+            EditorGUILayout.LabelField("显示引用", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(m_Viewport, new GUIContent("可视区域", m_Viewport.tooltip));
+            EditorGUILayout.PropertyField(m_ContentTemplate, new GUIContent("内容模板", m_ContentTemplate.tooltip));
         }
 
         private void DrawMode() {
-            EditorGUILayout.LabelField("Mode", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(m_ScrollMode);
-            EditorGUILayout.PropertyField(m_Direction);
+            EditorGUILayout.LabelField("滚动模式", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(m_ScrollMode, new GUIContent("滚动方式", m_ScrollMode.tooltip));
+            EditorGUILayout.PropertyField(m_Direction, new GUIContent("滚动方向", m_Direction.tooltip));
 
             bool sequential = m_ScrollMode.enumValueIndex == (int)MarqueeScrollMode.Sequential;
             using (new EditorGUI.DisabledScope(!sequential)) {
-                EditorGUILayout.PropertyField(m_PlayMode);
+                EditorGUILayout.PropertyField(m_PlayMode, new GUIContent("循环方式", m_PlayMode.tooltip));
             }
         }
 
         private void DrawLayoutTiming() {
-            EditorGUILayout.LabelField("Layout & Timing", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("布局与节奏", EditorStyles.boldLabel);
 
             bool continuous = m_ScrollMode.enumValueIndex == (int)MarqueeScrollMode.Continuous;
 
-            EditorGUILayout.PropertyField(m_ScrollSpeed);
-            EditorGUILayout.PropertyField(m_SegmentSpacing);
+            EditorGUILayout.PropertyField(m_ScrollSpeed, new GUIContent("滚动速度", m_ScrollSpeed.tooltip));
+            EditorGUILayout.PropertyField(m_SegmentSpacing, new GUIContent("片段间距", m_SegmentSpacing.tooltip));
 
             if (continuous) {
-                EditorGUILayout.PropertyField(m_Spacing);
+                EditorGUILayout.PropertyField(m_Spacing, new GUIContent("条目间距", m_Spacing.tooltip));
             } else {
-                EditorGUILayout.PropertyField(m_EdgeMargin);
-                EditorGUILayout.PropertyField(m_DisplayDurationBeforeScroll);
-                EditorGUILayout.PropertyField(m_Ease);
+                EditorGUILayout.PropertyField(m_EdgeMargin, new GUIContent("边缘留白", m_EdgeMargin.tooltip));
+                EditorGUILayout.PropertyField(m_DisplayDurationBeforeScroll, new GUIContent("滚动前停留", m_DisplayDurationBeforeScroll.tooltip));
+                EditorGUILayout.PropertyField(m_Ease, new GUIContent("缓动", m_Ease.tooltip));
 
                 if (m_Ease.enumValueIndex == (int)MarqueeEase.Custom) {
-                    EditorGUILayout.PropertyField(m_CustomCurve);
+                    EditorGUILayout.PropertyField(m_CustomCurve, new GUIContent("自定义曲线", m_CustomCurve.tooltip));
                 }
 
-                EditorGUILayout.PropertyField(m_CenterWhenFit);
+                EditorGUILayout.PropertyField(m_CenterWhenFit, new GUIContent("短内容居中", m_CenterWhenFit.tooltip));
 
                 using (new EditorGUI.DisabledScope(!m_CenterWhenFit.boolValue)) {
-                    EditorGUILayout.PropertyField(m_DisplayDurationWhenFit);
+                    EditorGUILayout.PropertyField(m_DisplayDurationWhenFit, new GUIContent("短内容停留", m_DisplayDurationWhenFit.tooltip));
                 }
             }
         }
 
         private void DrawPlayback() {
-            EditorGUILayout.LabelField("Playback", EditorStyles.boldLabel);
-            EditorGUILayout.PropertyField(m_PlayOnStart);
-            EditorGUILayout.PropertyField(m_IgnoreTimeScale);
+            EditorGUILayout.LabelField("播放设置", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(m_PlayOnStart, new GUIContent("启动时播放", m_PlayOnStart.tooltip));
+            EditorGUILayout.PropertyField(m_IgnoreTimeScale, new GUIContent("忽略时间缩放", m_IgnoreTimeScale.tooltip));
         }
 
         private void DrawItems() {
-            EditorGUILayout.PropertyField(m_Items, true);
+            EditorGUILayout.LabelField("播放内容", EditorStyles.boldLabel);
+            EditorGUILayout.PropertyField(m_Items, new GUIContent("条目列表"), true);
         }
 
         private void DrawValidation() {
@@ -141,7 +150,7 @@ namespace ZStudio.UniKit.UI.Editor {
 
         private void DrawRuntimeControls() {
             EditorGUILayout.Space();
-            EditorGUILayout.LabelField("Runtime", EditorStyles.boldLabel);
+            EditorGUILayout.LabelField("运行控制", EditorStyles.boldLabel);
 
             var marquee = (Marquee)target;
             EditorGUILayout.LabelField($"IsPlaying: {marquee.IsPlaying}    IsPaused: {marquee.IsPaused}    CurrentIndex: {marquee.CurrentIndex}");

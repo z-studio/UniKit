@@ -1,19 +1,16 @@
+#if ENABLE_INPUT_SYSTEM
+#endif
 using System;
 using System.Collections.Generic;
 using TMPro;
-using UnityEngine;
-using UnityEngine.EventSystems;
-using UnityEngine.UI;
-using ZStudio.UniKit.UI;
-#if ENABLE_INPUT_SYSTEM
-using UnityEngine.InputSystem.UI;
-#endif
-#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.SceneManagement;
-#endif
+using UnityEngine;
+using UnityEngine.EventSystems;
+using UnityEngine.InputSystem.UI;
+using UnityEngine.UI;
 
-namespace ZStudio.UIMarquee.Samples {
+namespace ZStudio.UniKit.UI.Samples {
     /// <summary>
     /// 综合功能演示（自包含，打开场景直接运行，无需额外资源/prefab）。运行时构建两条跑马灯，
     /// 并用 **纯 UGUI**（配合 CanvasScaler 自适应分辨率）搭建完整控制台演示组件全部核心能力：
@@ -25,18 +22,16 @@ namespace ZStudio.UIMarquee.Samples {
     /// 左侧 UGUI 面板提供全部运行时控制，右侧 ScrollRect 实时显示事件日志。
     /// 所有屏幕文本使用英文，以保证任何默认字体下都能正确显示（不依赖中文字体）。
     /// </summary>
-        public class UIMarqueeDemo : MonoBehaviour {
-        [Tooltip("逐条/无缝滚动速度（像素/秒）")]
-        public float scrollSpeed = 120f;
+    public class UIMarqueeDemo : MonoBehaviour {
+        [Tooltip("逐条/无缝滚动速度（像素/秒）")] public float ScrollSpeed = 120f;
 
-        [Tooltip("无缝模式相邻条目间距")]
-        public float spacing = 60f;
+        [Tooltip("无缝模式相邻条目间距")] public float Spacing = 60f;
 
-        [Tooltip("Sequential 跑马灯。留空则运行时自动创建；也可用右键菜单「Create Demo Marquees In Scene」在编辑器预先生成后自定义配置。")]
-        [SerializeField] private UniKit.UI.Marquee m_Sequential;
+        [Tooltip("Sequential 跑马灯。留空则运行时自动创建；也可用右键菜单「Create Demo Marquees In Scene」在编辑器预先生成后自定义配置。")] [SerializeField]
+        private Marquee m_Sequential;
 
-        [Tooltip("Continuous 跑马灯。留空则运行时自动创建；也可用右键菜单预先生成。")]
-        [SerializeField] private UniKit.UI.Marquee m_Continuous;
+        [Tooltip("Continuous 跑马灯。留空则运行时自动创建；也可用右键菜单预先生成。")] [SerializeField]
+        private Marquee m_Continuous;
 
         private Sprite m_DemoSprite;
         private Sprite m_RoundSprite; // UI 控件背景（圆角由纯色代替，保持零资源依赖）
@@ -47,7 +42,7 @@ namespace ZStudio.UIMarquee.Samples {
         // ---- 控制面板状态 ----
         private MarqueeDirection m_Direction = MarqueeDirection.Left;
         private int m_EaseIndex;
-        private bool m_Once;      // Sequential playMode == Once
+        private bool m_Once; // Sequential playMode == Once
         private int m_AddedCount; // Continuous 运行时追加计数
 
         // 面板上需要动态更新文字的控件
@@ -59,21 +54,17 @@ namespace ZStudio.UIMarquee.Samples {
 
         // 演示用的代表性缓动（覆盖线性 / 平滑 / 过冲 / 回弹）
         private static readonly MarqueeEase[] s_Eases = {
-            MarqueeEase.Linear,
-            MarqueeEase.QuadInOut,
-            MarqueeEase.CubicOut,
-            MarqueeEase.BackOut,
-            MarqueeEase.ElasticOut,
-            MarqueeEase.BounceOut,
+            MarqueeEase.Linear, MarqueeEase.QuadInOut, MarqueeEase.CubicOut, MarqueeEase.BackOut,
+            MarqueeEase.ElasticOut, MarqueeEase.BounceOut,
         };
 
         // ---- 配色 ----
-        private static readonly Color c_PanelBg = new(0.10f, 0.11f, 0.14f, 0.92f);
-        private static readonly Color c_SectionBg = new(1f, 1f, 1f, 0.05f);
-        private static readonly Color c_Button = new(0.22f, 0.25f, 0.33f, 1f);
-        private static readonly Color c_Accent = new(0.20f, 0.60f, 1f, 1f);
-        private static readonly Color c_Track = new(0f, 0f, 0f, 0.5f);
-        private static readonly Color c_MarqueeBg = new(0f, 0f, 0f, 0.35f);
+        private static readonly Color s_PanelBg = new(0.10f, 0.11f, 0.14f, 0.92f);
+        private static readonly Color s_SectionBg = new(1f, 1f, 1f, 0.05f);
+        private static readonly Color s_Button = new(0.22f, 0.25f, 0.33f, 1f);
+        private static readonly Color s_Accent = new(0.20f, 0.60f, 1f, 1f);
+        private static readonly Color s_Track = new(0f, 0f, 0f, 0.5f);
+        private static readonly Color s_MarqueeBg = new(0f, 0f, 0f, 0.35f);
 
         private void Start() {
             Canvas canvas = EnsureCanvasAndEventSystem();
@@ -117,13 +108,11 @@ namespace ZStudio.UIMarquee.Samples {
             m_ConItems = BuildContinuousItems();
 
             // 两条跑马灯整体右移，让出左侧空间给控制面板（面板宽 620 + 边距）
-            m_Sequential = BuildMarquee(
-                canvas.transform, "Marquee_Sequential",
+            m_Sequential = BuildMarquee(canvas.transform, "Marquee_Sequential",
                 anchoredX: 360f, anchoredY: 120f, width: 1040f, height: 72f,
                 MarqueeScrollMode.Sequential, m_Direction, m_SeqItems);
 
-            m_Continuous = BuildMarquee(
-                canvas.transform, "Marquee_Continuous",
+            m_Continuous = BuildMarquee(canvas.transform, "Marquee_Continuous",
                 anchoredX: 360f, anchoredY: 10f, width: 1040f, height: 72f,
                 MarqueeScrollMode.Continuous, m_Direction, m_ConItems);
 
@@ -131,7 +120,7 @@ namespace ZStudio.UIMarquee.Samples {
         }
 
         // Sequential 细化：演示居中停留、缓动、Loop 播放
-        private void ConfigureSequentialDefaults(UniKit.UI.Marquee marquee) {
+        private void ConfigureSequentialDefaults(Marquee marquee) {
             marquee.CenterWhenFit = true;
             marquee.DisplayDurationWhenFit = 1.5f;
             marquee.DisplayDurationBeforeScroll = 0.4f;
@@ -142,8 +131,8 @@ namespace ZStudio.UIMarquee.Samples {
         // 复用预创建对象时，用组件当前配置初始化控制面板显示状态
         private void SyncPanelStateFromComponents() {
             m_Direction = m_Continuous.Direction;
-            scrollSpeed = m_Continuous.ScrollSpeed;
-            spacing = m_Continuous.Spacing;
+            ScrollSpeed = m_Continuous.ScrollSpeed;
+            Spacing = m_Continuous.Spacing;
             m_Once = m_Sequential.PlayMode == MarqueePlayMode.Once;
             m_EaseIndex = Mathf.Max(0, System.Array.IndexOf(s_Eases, m_Sequential.Ease));
         }
@@ -155,7 +144,8 @@ namespace ZStudio.UIMarquee.Samples {
         [ContextMenu("Create Demo Marquees In Scene")]
         private void EditorCreateDemoMarquees() {
             if (m_Sequential != null || m_Continuous != null) {
-                Debug.LogWarning("[UIMarqueeDemo] Demo marquees already exist. Run 'Clear Demo Marquees In Scene' first.", this);
+                Debug.LogWarning(
+                    "[UIMarqueeDemo] Demo marquees already exist. Run 'Clear Demo Marquees In Scene' first.", this);
                 return;
             }
 
@@ -165,13 +155,11 @@ namespace ZStudio.UIMarquee.Samples {
             List<MarqueeItemData> seqItems = BuildSequentialItems();
             List<MarqueeItemData> conItems = BuildContinuousItems();
 
-            m_Sequential = BuildMarquee(
-                canvas.transform, "Marquee_Sequential",
+            m_Sequential = BuildMarquee(canvas.transform, "Marquee_Sequential",
                 anchoredX: 360f, anchoredY: 120f, width: 1040f, height: 72f,
                 MarqueeScrollMode.Sequential, m_Direction, seqItems);
 
-            m_Continuous = BuildMarquee(
-                canvas.transform, "Marquee_Continuous",
+            m_Continuous = BuildMarquee(canvas.transform, "Marquee_Continuous",
                 anchoredX: 360f, anchoredY: 10f, width: 1040f, height: 72f,
                 MarqueeScrollMode.Continuous, m_Direction, conItems);
 
@@ -183,7 +171,9 @@ namespace ZStudio.UIMarquee.Samples {
             MarkSceneDirty();
             Selection.activeObject = m_Sequential.gameObject;
 
-            Debug.Log("[UIMarqueeDemo] Created demo marquees. Tweak them in the Inspector; entering Play will reuse them.", this);
+            Debug.Log(
+                "[UIMarqueeDemo] Created demo marquees. Tweak them in the Inspector; entering Play will reuse them.",
+                this);
         }
 
         [ContextMenu("Clear Demo Marquees In Scene")]
@@ -240,16 +230,32 @@ namespace ZStudio.UIMarquee.Samples {
             // ---- 全局 ----
             RectTransform global = CreateSection(panel, "Global");
             RectTransform gRow = CreateRow(global);
-            CreateButton(gRow, "Pause", () => { m_Sequential.Pause(); m_Continuous.Pause(); Log("Pause()"); });
-            CreateButton(gRow, "Resume", () => { m_Sequential.Unpause(); m_Continuous.Unpause(); Log("Unpause()"); });
-            CreateButton(gRow, "Stop", () => { m_Sequential.Stop(); m_Continuous.Stop(); Log("Stop()"); });
-            CreateButton(gRow, "Replay", () => { m_Sequential.Play(); m_Continuous.Play(); Log("Play()"); });
+            CreateButton(gRow, "Pause", () => {
+                m_Sequential.Pause();
+                m_Continuous.Pause();
+                Log("Pause()");
+            });
+            CreateButton(gRow, "Resume", () => {
+                m_Sequential.Unpause();
+                m_Continuous.Unpause();
+                Log("Unpause()");
+            });
+            CreateButton(gRow, "Stop", () => {
+                m_Sequential.Stop();
+                m_Continuous.Stop();
+                Log("Stop()");
+            });
+            CreateButton(gRow, "Replay", () => {
+                m_Sequential.Play();
+                m_Continuous.Play();
+                Log("Play()");
+            });
 
             m_DirectionLabel = CreateButton(global, $"Direction: {m_Direction}  (cycle)", CycleDirection);
 
             m_SpeedLabel = CreateLabel(global, "", 22f, FontStyles.Normal, Color.white);
-            CreateSlider(global, 20f, 400f, scrollSpeed, OnSpeedChanged);
-            OnSpeedChanged(scrollSpeed);
+            CreateSlider(global, 20f, 400f, ScrollSpeed, OnSpeedChanged);
+            OnSpeedChanged(ScrollSpeed);
 
             // ---- Sequential ----
             RectTransform seq = CreateSection(panel, "Sequential (top row)");
@@ -260,8 +266,8 @@ namespace ZStudio.UIMarquee.Samples {
             // ---- Continuous ----
             RectTransform con = CreateSection(panel, "Continuous (bottom row)");
             m_SpacingLabel = CreateLabel(con, "", 22f, FontStyles.Normal, Color.white);
-            CreateSlider(con, 0f, 160f, spacing, OnSpacingChanged);
-            OnSpacingChanged(spacing);
+            CreateSlider(con, 0f, 160f, Spacing, OnSpacingChanged);
+            OnSpacingChanged(Spacing);
             RectTransform cRow = CreateRow(con);
             CreateButton(cRow, "Apply Spacing (Refresh)", ApplySpacing);
             CreateButton(cRow, "AddItem (+Refresh)", AddItemDemo);
@@ -272,33 +278,42 @@ namespace ZStudio.UIMarquee.Samples {
         // ------------------------------------------------------------------
 
         private void OnSpeedChanged(float v) {
-            scrollSpeed = v;
-            if (m_Sequential != null) m_Sequential.ScrollSpeed = v; // 下一条滚动生效
-            if (m_Continuous != null) m_Continuous.ScrollSpeed = v; // 逐帧读取，立即生效
-            if (m_SpeedLabel != null) m_SpeedLabel.text = $"Scroll Speed: {v:0} px/s  (Continuous is live)";
+            ScrollSpeed = v;
+
+            if (m_Sequential != null) {
+                m_Sequential.ScrollSpeed = v; // 下一条滚动生效
+            }
+
+            if (m_Continuous != null) {
+                m_Continuous.ScrollSpeed = v; // 逐帧读取，立即生效
+            }
+
+            if (m_SpeedLabel != null) {
+                m_SpeedLabel.text = $"Scroll Speed: {v:0} px/s  (Continuous is live)";
+            }
         }
 
         private void OnSpacingChanged(float v) {
-            spacing = v;
+            Spacing = v;
             if (m_SpacingLabel != null) m_SpacingLabel.text = $"Spacing: {v:0} px  (Apply to Refresh)";
         }
 
         private void ApplySpacing() {
-            m_Continuous.Spacing = spacing;
+            m_Continuous.Spacing = Spacing;
             m_Continuous.Refresh();
-            Log($"[Con] spacing={spacing:0} + Refresh()");
+            Log($"[Con] spacing={Spacing:0} + Refresh()");
         }
 
         private void AddItemDemo() {
             m_AddedCount++;
-            m_Continuous.AddItem(MarqueeItemData.Text($"[Added #{m_AddedCount}] runtime-appended item", $"added_{m_AddedCount}"));
+            m_Continuous.AddItem(MarqueeItemData.Text($"[Added #{m_AddedCount}] runtime-appended item",
+                $"added_{m_AddedCount}"));
             m_Continuous.Refresh();
             Log($"[Con] AddItem #{m_AddedCount} + Refresh()");
         }
 
         private void PlayOnceDemo() {
-            m_Sequential.PlayOnce(
-                "PlayOnce: a one-shot message inserted at runtime.",
+            m_Sequential.PlayOnce("PlayOnce: a one-shot message inserted at runtime.",
                 () => {
                     Log("[Seq] PlayOnce onComplete -> resume loop");
                     m_Sequential.Play();
@@ -316,6 +331,7 @@ namespace ZStudio.UIMarquee.Samples {
 
             m_Sequential.Direction = m_Direction;
             m_Continuous.Direction = m_Direction;
+            
             // 方向改动需要重建布局才即时可见
             m_Sequential.Play();
             m_Continuous.Play();
@@ -326,6 +342,7 @@ namespace ZStudio.UIMarquee.Samples {
         private void CycleEase() {
             m_EaseIndex = (m_EaseIndex + 1) % s_Eases.Length;
             m_Sequential.Ease = s_Eases[m_EaseIndex];
+            
             // ease 每条滚动开始时读取，无需 Refresh，下一条即生效
             m_EaseLabel.text = $"Ease: {s_Eases[m_EaseIndex]}  (cycle)";
             Log($"[Seq] ease = {s_Eases[m_EaseIndex]} (applies to next scroll)");
@@ -347,12 +364,14 @@ namespace ZStudio.UIMarquee.Samples {
             return new List<MarqueeItemData> {
                 MarqueeItemData.Text("Welcome to the UIMarquee full-feature demo!", "seq_welcome"),
                 MarqueeItemData.Text("Short text (centered dwell)", "seq_short"),
-                new MarqueeItemData(
-                    new MarqueeTextSegment("Mixed: "),
+                new MarqueeItemData(new MarqueeTextSegment("Mixed: "),
                     new MarqueeImageSegment(m_DemoSprite) { Size = new Vector2(32f, 32f) },
                     new MarqueeTextSegment(" text + image in one item")) { ID = "seq_mixed" },
-                MarqueeItemData.Text("[Limited x2] This notice appears only twice, then is skipped.", "seq_limited", cycles: 2),
-                MarqueeItemData.Text("This is a long scrolling notice that demonstrates the easing curve and smooth scrolling when content exceeds the viewport.", "seq_long"),
+                MarqueeItemData.Text("[Limited x2] This notice appears only twice, then is skipped.", "seq_limited",
+                    cycles: 2),
+                MarqueeItemData.Text(
+                    "This is a long scrolling notice that demonstrates the easing curve and smooth scrolling when content exceeds the viewport.",
+                    "seq_long"),
                 MarqueeItemData.Image(m_DemoSprite, "seq_icon"),
             };
         }
@@ -361,8 +380,7 @@ namespace ZStudio.UIMarquee.Samples {
             return new List<MarqueeItemData> {
                 MarqueeItemData.Text("Continuous mode: items scroll end-to-end seamlessly", "con_tip1"),
                 MarqueeItemData.Text("* Limited-time event is live *", "con_tip2"),
-                new MarqueeItemData(
-                    new MarqueeTextSegment("Reward: "),
+                new MarqueeItemData(new MarqueeTextSegment("Reward: "),
                     new MarqueeImageSegment(m_DemoSprite) { Size = new Vector2(28f, 28f) }) { ID = "con_mixed" },
                 MarqueeItemData.Text("Click me to fire OnItemClicked", "con_click"),
                 MarqueeItemData.Image(m_DemoSprite, "con_icon"),
@@ -373,8 +391,7 @@ namespace ZStudio.UIMarquee.Samples {
         // 跑马灯构建
         // ------------------------------------------------------------------
 
-        private UniKit.UI.Marquee BuildMarquee(
-            Transform parent,
+        private Marquee BuildMarquee(Transform parent,
             string name,
             float anchoredX,
             float anchoredY,
@@ -395,7 +412,7 @@ namespace ZStudio.UIMarquee.Samples {
             viewport.sizeDelta = new Vector2(width, height);
 
             var bg = viewportGo.GetComponent<Image>();
-            bg.color = c_MarqueeBg;
+            bg.color = s_MarqueeBg;
             bg.raycastTarget = false;
 
             var templateGo = new GameObject("ContentTemplate", typeof(RectTransform));
@@ -409,19 +426,20 @@ namespace ZStudio.UIMarquee.Samples {
 
             var textGo = new GameObject("Text", typeof(RectTransform));
             textGo.transform.SetParent(template, false);
+            
             var text = textGo.AddComponent<TextMeshProUGUI>();
             text.fontSize = 32f;
             text.color = Color.white;
             text.alignment = TextAlignmentOptions.Left;
             text.raycastTarget = true; // 点击事件需要
 
-            var marquee = viewportGo.AddComponent<UniKit.UI.Marquee>();
+            var marquee = viewportGo.AddComponent<Marquee>();
             marquee.Viewport = viewport;
             marquee.ContentTemplate = template;
             marquee.ScrollMode = mode;
             marquee.Direction = direction;
-            marquee.ScrollSpeed = scrollSpeed;
-            marquee.Spacing = spacing;
+            marquee.ScrollSpeed = ScrollSpeed;
+            marquee.Spacing = Spacing;
             marquee.EdgeMargin = 10f;
             marquee.DisplayDurationWhenFit = 2f;
             marquee.DisplayDurationBeforeScroll = 0.5f;
@@ -437,7 +455,7 @@ namespace ZStudio.UIMarquee.Samples {
         // ------------------------------------------------------------------
 
         private Canvas EnsureCanvasAndEventSystem() {
-            Canvas canvas = FindFirstObjectByType<Canvas>();
+            var canvas = FindFirstObjectByType<Canvas>();
 
             if (canvas == null) {
                 var go = new GameObject("Canvas", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -447,6 +465,7 @@ namespace ZStudio.UIMarquee.Samples {
 
             // CanvasScaler：按屏幕尺寸缩放，保证不同分辨率下布局一致
             var scaler = canvas.GetComponent<CanvasScaler>();
+
             if (scaler == null) {
                 scaler = canvas.gameObject.AddComponent<CanvasScaler>();
             }
@@ -476,7 +495,8 @@ namespace ZStudio.UIMarquee.Samples {
         // 一个带背景与垂直布局、宽度固定、高度随内容的面板
         private RectTransform CreatePanel(Transform parent, string name, Vector2 anchorMin, Vector2 anchorMax,
             Vector2 pivot, Vector2 anchoredPos, float width) {
-            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            var go = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup),
+                typeof(ContentSizeFitter));
             var rt = go.GetComponent<RectTransform>();
             rt.SetParent(parent, false);
             rt.anchorMin = anchorMin;
@@ -487,7 +507,7 @@ namespace ZStudio.UIMarquee.Samples {
 
             var img = go.GetComponent<Image>();
             img.sprite = m_RoundSprite;
-            img.color = c_PanelBg;
+            img.color = s_PanelBg;
 
             var vlg = go.GetComponent<VerticalLayoutGroup>();
             vlg.padding = new RectOffset(20, 20, 20, 20);
@@ -505,15 +525,16 @@ namespace ZStudio.UIMarquee.Samples {
 
         // 分组：标题 + 一个带淡色背景、内部垂直排列的容器
         private RectTransform CreateSection(RectTransform parent, string title) {
-            CreateLabel(parent, title, 26f, FontStyles.Bold, c_Accent);
+            CreateLabel(parent, title, 26f, FontStyles.Bold, s_Accent);
 
-            var go = new GameObject($"Section_{title}", typeof(RectTransform), typeof(Image), typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
+            var go = new GameObject($"Section_{title}", typeof(RectTransform), typeof(Image),
+                typeof(VerticalLayoutGroup), typeof(ContentSizeFitter));
             var rt = go.GetComponent<RectTransform>();
             rt.SetParent(parent, false);
 
             var img = go.GetComponent<Image>();
             img.sprite = m_RoundSprite;
-            img.color = c_SectionBg;
+            img.color = s_SectionBg;
 
             var vlg = go.GetComponent<VerticalLayoutGroup>();
             vlg.padding = new RectOffset(14, 14, 14, 14);
@@ -545,7 +566,8 @@ namespace ZStudio.UIMarquee.Samples {
             return rt;
         }
 
-        private TextMeshProUGUI CreateLabel(RectTransform parent, string text, float fontSize, FontStyles style, Color color) {
+        private TextMeshProUGUI CreateLabel(RectTransform parent, string text, float fontSize, FontStyles style,
+            Color color) {
             var go = new GameObject("Label", typeof(RectTransform));
             go.transform.SetParent(parent, false);
             var tmp = go.AddComponent<TextMeshProUGUI>();
@@ -560,13 +582,14 @@ namespace ZStudio.UIMarquee.Samples {
 
         // 返回按钮上的文字标签（便于动态更新，如 Direction/Ease/PlayMode）
         private TextMeshProUGUI CreateButton(RectTransform parent, string label, Action onClick) {
-            var go = new GameObject("Button", typeof(RectTransform), typeof(Image), typeof(Button), typeof(LayoutElement));
+            var go = new GameObject("Button", typeof(RectTransform), typeof(Image), typeof(Button),
+                typeof(LayoutElement));
             var rt = go.GetComponent<RectTransform>();
             rt.SetParent(parent, false);
 
             var img = go.GetComponent<Image>();
             img.sprite = m_RoundSprite;
-            img.color = c_Button;
+            img.color = s_Button;
 
             var btn = go.GetComponent<Button>();
             btn.targetGraphic = img;
@@ -605,28 +628,30 @@ namespace ZStudio.UIMarquee.Samples {
             rt.SetParent(parent, false);
             go.GetComponent<LayoutElement>().minHeight = 36f;
 
-            const float handleR = 14f;
+            const float k_HandleR = 14f;
 
-            Image bg = CreateUIImage(rt, "Background", c_Track);
+            Image bg = CreateUIImage(rt, "Background", s_Track);
             SetAnchors(bg.rectTransform, new Vector2(0f, 0.35f), new Vector2(1f, 0.65f), Vector2.zero, Vector2.zero);
 
             var fillAreaGo = new GameObject("Fill Area", typeof(RectTransform));
             var fillArea = fillAreaGo.GetComponent<RectTransform>();
             fillArea.SetParent(rt, false);
-            SetAnchors(fillArea, new Vector2(0f, 0.35f), new Vector2(1f, 0.65f), new Vector2(handleR, 0f), new Vector2(-handleR, 0f));
+            SetAnchors(fillArea, new Vector2(0f, 0.35f), new Vector2(1f, 0.65f), new Vector2(k_HandleR, 0f),
+                new Vector2(-k_HandleR, 0f));
 
-            Image fill = CreateUIImage(fillArea, "Fill", c_Accent);
+            Image fill = CreateUIImage(fillArea, "Fill", s_Accent);
             SetAnchors(fill.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
 
             var handleAreaGo = new GameObject("Handle Slide Area", typeof(RectTransform));
             var handleArea = handleAreaGo.GetComponent<RectTransform>();
             handleArea.SetParent(rt, false);
-            SetAnchors(handleArea, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(handleR, 0f), new Vector2(-handleR, 0f));
+            SetAnchors(handleArea, new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(k_HandleR, 0f),
+                new Vector2(-k_HandleR, 0f));
 
             Image handle = CreateUIImage(handleArea, "Handle", Color.white);
             handle.rectTransform.anchorMin = new Vector2(0f, 0f);
             handle.rectTransform.anchorMax = new Vector2(0f, 1f);
-            handle.rectTransform.sizeDelta = new Vector2(handleR * 2f, 0f);
+            handle.rectTransform.sizeDelta = new Vector2(k_HandleR * 2f, 0f);
 
             var slider = go.GetComponent<Slider>();
             slider.fillRect = fill.rectTransform;
@@ -649,7 +674,8 @@ namespace ZStudio.UIMarquee.Samples {
             return img;
         }
 
-        private static void SetAnchors(RectTransform rt, Vector2 min, Vector2 max, Vector2 offsetMin, Vector2 offsetMax) {
+        private static void SetAnchors(RectTransform rt, Vector2 min, Vector2 max, Vector2 offsetMin,
+            Vector2 offsetMax) {
             rt.anchorMin = min;
             rt.anchorMax = max;
             rt.offsetMin = offsetMin;
