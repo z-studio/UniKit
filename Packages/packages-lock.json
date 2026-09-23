@@ -24,6 +24,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.unity.2d.sprite": {
+      "version": "1.0.0",
+      "depth": 0,
+      "source": "builtin",
+      "dependencies": {}
+    },
     "com.unity.ai.navigation": {
       "version": "2.0.14",
       "depth": 0,
@@ -222,6 +228,15 @@
       "depth": 0,
       "source": "embedded",
       "dependencies": {}
+    },
+    "com.z-studio.unikit.sfgen": {
+      "version": "file:com.z-studio.unikit.sfgen",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0",
+        "com.unity.2d.sprite": "1.0.0"
+      }
     },
     "com.z-studio.unikit.ui.marquee": {
       "version": "file:com.z-studio.unikit.ui.marquee",

@@ -1,0 +1,20 @@
+{
+    "name": "ZStudio.UniKit.BitmapFontBuilder",
+    "rootNamespace": "ZStudio.UniKit",
+    "references": [
+        "Unity.TextMeshPro",
+        "Unity.2D.Sprite.Editor",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
