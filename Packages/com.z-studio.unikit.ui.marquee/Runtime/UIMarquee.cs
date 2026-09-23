@@ -19,13 +19,13 @@ namespace ZStudio.UniKit.UI {
         public List<MarqueeItemData> Items = new();
 
         [Tooltip("滚动模式：Sequential 逐条轮播；Continuous 无缝连续滚动")]
-        public EMarqueeScrollMode ScrollMode = EMarqueeScrollMode.Sequential;
+        public MarqueeScrollMode ScrollMode = MarqueeScrollMode.Sequential;
 
         [Tooltip("滚动方向")]
-        public EMarqueeDirection Direction = EMarqueeDirection.Left;
+        public MarqueeDirection Direction = MarqueeDirection.Left;
 
         [Tooltip("循环 或 单次（仅 Sequential 模式生效）")]
-        public EMarqueePlayMode PlayMode = EMarqueePlayMode.Loop;
+        public MarqueePlayMode PlayMode = MarqueePlayMode.Loop;
 
         [Tooltip("内容边缘与可视区域边缘的距离（仅在内容超出可视区域时有效）")]
         [Min(0f)]
@@ -47,7 +47,7 @@ namespace ZStudio.UniKit.UI {
         public float ScrollSpeed = 100f;
 
         [Tooltip("滚动缓动（仅 Sequential 模式生效；Continuous 为保证无缝始终匀速）")]
-        public EMarqueeEase Ease = EMarqueeEase.Linear;
+        public MarqueeEase Ease = MarqueeEase.Linear;
 
         [Tooltip("自定义缓动曲线（ease == Custom 时生效）：横轴 0→1 为进度，纵轴 0→1 为位移比例")]
         public AnimationCurve CustomCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
@@ -260,7 +260,7 @@ namespace ZStudio.UniKit.UI {
             m_IsOneShot = false;
             m_ForceOnce = false;
 
-            if (ScrollMode == EMarqueeScrollMode.Continuous) {
+            if (ScrollMode == MarqueeScrollMode.Continuous) {
                 m_Routine = StartCoroutine(RunContinuous(runId));
             } else {
                 ResetRemaining();
@@ -302,7 +302,7 @@ namespace ZStudio.UniKit.UI {
                 return;
             }
 
-            Play(ScrollMode == EMarqueeScrollMode.Continuous ? 0 : Mathf.Max(0, m_CurrentIndex));
+            Play(ScrollMode == MarqueeScrollMode.Continuous ? 0 : Mathf.Max(0, m_CurrentIndex));
         }
 
         /// <summary>设置条目并可选是否立即开始播放。</summary>
@@ -392,7 +392,7 @@ namespace ZStudio.UniKit.UI {
         /// 被打断或 <paramref name="cancellationToken"/> 取消时，await 处抛出 <see cref="OperationCanceledException"/>。
         /// </summary>
         public Awaitable PlaySequenceOnceAsync(int startIndex = 0, CancellationToken cancellationToken = default) {
-            if (ScrollMode == EMarqueeScrollMode.Continuous) {
+            if (ScrollMode == MarqueeScrollMode.Continuous) {
                 Debug.LogWarning("UIMarquee: PlaySequenceOnceAsync 仅适用于 Sequential 模式，Continuous 无自然终点。已忽略。", this);
                 return CompletedAwaitable();
             }
@@ -557,7 +557,7 @@ namespace ZStudio.UniKit.UI {
                 m_SeqUnit.root.gameObject.SetActive(true);
             }
 
-            bool loop = !m_ForceOnce && PlayMode == EMarqueePlayMode.Loop;
+            bool loop = !m_ForceOnce && PlayMode == MarqueePlayMode.Loop;
             bool naturalEnd = false;
 
             while (runId == m_RunId) {
@@ -652,7 +652,7 @@ namespace ZStudio.UniKit.UI {
                 if (!IsPaused) {
                     elapsed += DeltaTime();
                     float t = Mathf.Clamp01(elapsed / duration);
-                    float eased = Ease == EMarqueeEase.Custom && CustomCurve != null
+                    float eased = Ease == MarqueeEase.Custom && CustomCurve != null
                         ? CustomCurve.Evaluate(t)
                         : MarqueeMath.Evaluate(Ease, t);
                     m_SeqUnit.root.anchoredPosition = Vector2.LerpUnclamped(start, end, eased);

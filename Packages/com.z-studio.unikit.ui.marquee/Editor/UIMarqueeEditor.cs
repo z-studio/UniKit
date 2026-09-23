@@ -82,7 +82,7 @@ namespace ZStudio.UniKit.UI.Editor {
             EditorGUILayout.PropertyField(m_ScrollMode);
             EditorGUILayout.PropertyField(m_Direction);
 
-            bool sequential = m_ScrollMode.enumValueIndex == (int)EMarqueeScrollMode.Sequential;
+            bool sequential = m_ScrollMode.enumValueIndex == (int)MarqueeScrollMode.Sequential;
             using (new EditorGUI.DisabledScope(!sequential)) {
                 EditorGUILayout.PropertyField(m_PlayMode);
             }
@@ -91,7 +91,7 @@ namespace ZStudio.UniKit.UI.Editor {
         private void DrawLayoutTiming() {
             EditorGUILayout.LabelField("Layout & Timing", EditorStyles.boldLabel);
 
-            bool continuous = m_ScrollMode.enumValueIndex == (int)EMarqueeScrollMode.Continuous;
+            bool continuous = m_ScrollMode.enumValueIndex == (int)MarqueeScrollMode.Continuous;
 
             EditorGUILayout.PropertyField(m_ScrollSpeed);
             EditorGUILayout.PropertyField(m_SegmentSpacing);
@@ -103,7 +103,7 @@ namespace ZStudio.UniKit.UI.Editor {
                 EditorGUILayout.PropertyField(m_DisplayDurationBeforeScroll);
                 EditorGUILayout.PropertyField(m_Ease);
 
-                if (m_Ease.enumValueIndex == (int)EMarqueeEase.Custom) {
+                if (m_Ease.enumValueIndex == (int)MarqueeEase.Custom) {
                     EditorGUILayout.PropertyField(m_CustomCurve);
                 }
 

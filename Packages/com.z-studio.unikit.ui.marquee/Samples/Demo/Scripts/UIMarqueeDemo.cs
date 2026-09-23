@@ -45,7 +45,7 @@ namespace ZStudio.UIMarquee.Samples {
         private List<MarqueeItemData> m_ConItems;
 
         // ---- 控制面板状态 ----
-        private EMarqueeDirection m_Direction = EMarqueeDirection.Left;
+        private MarqueeDirection m_Direction = MarqueeDirection.Left;
         private int m_EaseIndex;
         private bool m_Once;      // Sequential playMode == Once
         private int m_AddedCount; // Continuous 运行时追加计数
@@ -58,13 +58,13 @@ namespace ZStudio.UIMarquee.Samples {
         private TextMeshProUGUI m_SpacingLabel;
 
         // 演示用的代表性缓动（覆盖线性 / 平滑 / 过冲 / 回弹）
-        private static readonly EMarqueeEase[] s_Eases = {
-            EMarqueeEase.Linear,
-            EMarqueeEase.QuadInOut,
-            EMarqueeEase.CubicOut,
-            EMarqueeEase.BackOut,
-            EMarqueeEase.ElasticOut,
-            EMarqueeEase.BounceOut,
+        private static readonly MarqueeEase[] s_Eases = {
+            MarqueeEase.Linear,
+            MarqueeEase.QuadInOut,
+            MarqueeEase.CubicOut,
+            MarqueeEase.BackOut,
+            MarqueeEase.ElasticOut,
+            MarqueeEase.BounceOut,
         };
 
         // ---- 配色 ----
@@ -120,12 +120,12 @@ namespace ZStudio.UIMarquee.Samples {
             m_Sequential = BuildMarquee(
                 canvas.transform, "Marquee_Sequential",
                 anchoredX: 360f, anchoredY: 120f, width: 1040f, height: 72f,
-                EMarqueeScrollMode.Sequential, m_Direction, m_SeqItems);
+                MarqueeScrollMode.Sequential, m_Direction, m_SeqItems);
 
             m_Continuous = BuildMarquee(
                 canvas.transform, "Marquee_Continuous",
                 anchoredX: 360f, anchoredY: 10f, width: 1040f, height: 72f,
-                EMarqueeScrollMode.Continuous, m_Direction, m_ConItems);
+                MarqueeScrollMode.Continuous, m_Direction, m_ConItems);
 
             ConfigureSequentialDefaults(m_Sequential);
         }
@@ -136,7 +136,7 @@ namespace ZStudio.UIMarquee.Samples {
             marquee.DisplayDurationWhenFit = 1.5f;
             marquee.DisplayDurationBeforeScroll = 0.4f;
             marquee.Ease = s_Eases[m_EaseIndex];
-            marquee.PlayMode = EMarqueePlayMode.Loop;
+            marquee.PlayMode = MarqueePlayMode.Loop;
         }
 
         // 复用预创建对象时，用组件当前配置初始化控制面板显示状态
@@ -144,7 +144,7 @@ namespace ZStudio.UIMarquee.Samples {
             m_Direction = m_Continuous.Direction;
             scrollSpeed = m_Continuous.ScrollSpeed;
             spacing = m_Continuous.Spacing;
-            m_Once = m_Sequential.PlayMode == EMarqueePlayMode.Once;
+            m_Once = m_Sequential.PlayMode == MarqueePlayMode.Once;
             m_EaseIndex = Mathf.Max(0, System.Array.IndexOf(s_Eases, m_Sequential.Ease));
         }
 
@@ -168,12 +168,12 @@ namespace ZStudio.UIMarquee.Samples {
             m_Sequential = BuildMarquee(
                 canvas.transform, "Marquee_Sequential",
                 anchoredX: 360f, anchoredY: 120f, width: 1040f, height: 72f,
-                EMarqueeScrollMode.Sequential, m_Direction, seqItems);
+                MarqueeScrollMode.Sequential, m_Direction, seqItems);
 
             m_Continuous = BuildMarquee(
                 canvas.transform, "Marquee_Continuous",
                 anchoredX: 360f, anchoredY: 10f, width: 1040f, height: 72f,
-                EMarqueeScrollMode.Continuous, m_Direction, conItems);
+                MarqueeScrollMode.Continuous, m_Direction, conItems);
 
             ConfigureSequentialDefaults(m_Sequential);
 
@@ -308,10 +308,10 @@ namespace ZStudio.UIMarquee.Samples {
 
         private void CycleDirection() {
             m_Direction = m_Direction switch {
-                EMarqueeDirection.Left => EMarqueeDirection.Right,
-                EMarqueeDirection.Right => EMarqueeDirection.Up,
-                EMarqueeDirection.Up => EMarqueeDirection.Down,
-                _ => EMarqueeDirection.Left
+                MarqueeDirection.Left => MarqueeDirection.Right,
+                MarqueeDirection.Right => MarqueeDirection.Up,
+                MarqueeDirection.Up => MarqueeDirection.Down,
+                _ => MarqueeDirection.Left
             };
 
             m_Sequential.Direction = m_Direction;
@@ -333,7 +333,7 @@ namespace ZStudio.UIMarquee.Samples {
 
         private void TogglePlayMode() {
             m_Once = !m_Once;
-            m_Sequential.PlayMode = m_Once ? EMarqueePlayMode.Once : EMarqueePlayMode.Loop;
+            m_Sequential.PlayMode = m_Once ? MarqueePlayMode.Once : MarqueePlayMode.Loop;
             m_Sequential.Play(); // 从头开始，使新播放模式生效
             m_PlayModeLabel.text = $"PlayMode: {(m_Once ? "Once" : "Loop")}  (toggle)";
             Log($"[Seq] playMode = {(m_Once ? "Once" : "Loop")} (restarted)");
@@ -380,8 +380,8 @@ namespace ZStudio.UIMarquee.Samples {
             float anchoredY,
             float width,
             float height,
-            EMarqueeScrollMode mode,
-            EMarqueeDirection direction,
+            MarqueeScrollMode mode,
+            MarqueeDirection direction,
             List<MarqueeItemData> items) {
             var viewportGo = new GameObject(name, typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             viewportGo.transform.SetParent(parent, false);

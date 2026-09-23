@@ -5,7 +5,7 @@ namespace ZStudio.UniKit.UI {
     /// <summary>
     /// 播放模式：循环 或 单次
     /// </summary>
-    public enum EMarqueePlayMode {
+    public enum MarqueePlayMode {
         Loop,
         Once
     }
@@ -13,7 +13,7 @@ namespace ZStudio.UniKit.UI {
     /// <summary>
     /// 滚动模式：Sequential 逐条轮播；Continuous 无缝连续滚动
     /// </summary>
-    public enum EMarqueeScrollMode {
+    public enum MarqueeScrollMode {
         Sequential,
         Continuous
     }
@@ -21,7 +21,7 @@ namespace ZStudio.UniKit.UI {
     /// <summary>
     /// 滚动方向
     /// </summary>
-    public enum EMarqueeDirection {
+    public enum MarqueeDirection {
         Left,
         Right,
         Up,
@@ -32,7 +32,7 @@ namespace ZStudio.UniKit.UI {
     /// 滚动缓动类型（仅 Sequential 模式生效）。涵盖主流缓动家族；Custom 表示使用自定义 AnimationCurve。
     /// 命名与公式遵循 easings.net 约定。
     /// </summary>
-    public enum EMarqueeEase {
+    public enum MarqueeEase {
         Linear,
         SineIn,
         SineOut,
@@ -72,33 +72,33 @@ namespace ZStudio.UniKit.UI {
     /// </summary>
     public static class MarqueeMath {
         /// <summary>是否为水平方向。</summary>
-        public static bool IsHorizontal(EMarqueeDirection dir) {
-            return dir == EMarqueeDirection.Left || dir == EMarqueeDirection.Right;
+        public static bool IsHorizontal(MarqueeDirection dir) {
+            return dir is MarqueeDirection.Left or MarqueeDirection.Right;
         }
 
         /// <summary>取尺寸在滚动轴上的分量。</summary>
-        public static float AxisSize(EMarqueeDirection dir, Vector2 size) {
+        public static float AxisSize(MarqueeDirection dir, Vector2 size) {
             return IsHorizontal(dir) ? size.x : size.y;
         }
 
         /// <summary>滚动轴上的方向符号（Right/Up 为 +1，Left/Down 为 -1）。</summary>
-        public static float FlowSign(EMarqueeDirection dir) {
-            return dir is EMarqueeDirection.Right or EMarqueeDirection.Up ? 1f : -1f;
+        public static float FlowSign(MarqueeDirection dir) {
+            return dir is MarqueeDirection.Right or MarqueeDirection.Up ? 1f : -1f;
         }
 
         /// <summary>滚动方向的单位向量（内容流出的方向）。</summary>
-        public static Vector2 FlowVector(EMarqueeDirection dir) {
+        public static Vector2 FlowVector(MarqueeDirection dir) {
             return dir switch {
-                EMarqueeDirection.Left => new Vector2(-1f, 0f),
-                EMarqueeDirection.Right => new Vector2(1f, 0f),
-                EMarqueeDirection.Up => new Vector2(0f, 1f),
-                EMarqueeDirection.Down => new Vector2(0f, -1f),
+                MarqueeDirection.Left => new Vector2(-1f, 0f),
+                MarqueeDirection.Right => new Vector2(1f, 0f),
+                MarqueeDirection.Up => new Vector2(0f, 1f),
+                MarqueeDirection.Down => new Vector2(0f, -1f),
                 _ => new Vector2(-1f, 0f)
             };
         }
 
         /// <summary>内容在滚动轴上的尺寸是否超过视口（需要滚动）。</summary>
-        public static bool IsOverflow(EMarqueeDirection dir, Vector2 viewportSize, Vector2 contentSize) {
+        public static bool IsOverflow(MarqueeDirection dir, Vector2 viewportSize, Vector2 contentSize) {
             return AxisSize(dir, contentSize) > AxisSize(dir, viewportSize) + 0.01f;
         }
 
@@ -107,7 +107,7 @@ namespace ZStudio.UniKit.UI {
         /// 起点：内容贴“流出边”内侧 margin 处（初始即可见）；终点：内容完全移出“流出边”。
         /// </summary>
         public static void ComputeScrollPositions(
-            EMarqueeDirection dir,
+            MarqueeDirection dir,
             Vector2 viewportSize,
             Vector2 contentSize,
             float margin,
@@ -187,59 +187,59 @@ namespace ZStudio.UniKit.UI {
         /// 计算缓动后的进度（输入裁剪到 [0,1]；Back/Elastic/Bounce 输出可超出 [0,1] 形成过冲/回弹）。
         /// 公式遵循 easings.net，无外部依赖。Custom 无曲线信息，按线性返回（由调用方用 AnimationCurve 处理）。
         /// </summary>
-        public static float Evaluate(EMarqueeEase ease, float t) {
+        public static float Evaluate(MarqueeEase ease, float t) {
             t = Mathf.Clamp01(t);
 
-            const float c1 = 1.70158f;
-            const float c2 = c1 * 1.525f;
-            const float c3 = c1 + 1f;
-            const float c4 = 2f * Mathf.PI / 3f;
-            const float c5 = 2f * Mathf.PI / 4.5f;
+            const float k_C1 = 1.70158f;
+            const float k_C2 = k_C1 * 1.525f;
+            const float k_C3 = k_C1 + 1f;
+            const float k_C4 = 2f * Mathf.PI / 3f;
+            const float k_C5 = 2f * Mathf.PI / 4.5f;
 
             switch (ease) {
-                case EMarqueeEase.Linear:
+                case MarqueeEase.Linear:
                     return t;
 
-                case EMarqueeEase.SineIn:
+                case MarqueeEase.SineIn:
                     return 1f - Mathf.Cos(t * Mathf.PI / 2f);
-                case EMarqueeEase.SineOut:
+                case MarqueeEase.SineOut:
                     return Mathf.Sin(t * Mathf.PI / 2f);
-                case EMarqueeEase.SineInOut:
+                case MarqueeEase.SineInOut:
                     return -(Mathf.Cos(Mathf.PI * t) - 1f) / 2f;
 
-                case EMarqueeEase.QuadIn:
+                case MarqueeEase.QuadIn:
                     return t * t;
-                case EMarqueeEase.QuadOut:
+                case MarqueeEase.QuadOut:
                     return 1f - (1f - t) * (1f - t);
-                case EMarqueeEase.QuadInOut:
+                case MarqueeEase.QuadInOut:
                     return t < 0.5f ? 2f * t * t : 1f - Mathf.Pow(-2f * t + 2f, 2f) / 2f;
 
-                case EMarqueeEase.CubicIn:
+                case MarqueeEase.CubicIn:
                     return t * t * t;
-                case EMarqueeEase.CubicOut:
+                case MarqueeEase.CubicOut:
                     return 1f - Mathf.Pow(1f - t, 3f);
-                case EMarqueeEase.CubicInOut:
+                case MarqueeEase.CubicInOut:
                     return t < 0.5f ? 4f * t * t * t : 1f - Mathf.Pow(-2f * t + 2f, 3f) / 2f;
 
-                case EMarqueeEase.QuartIn:
+                case MarqueeEase.QuartIn:
                     return t * t * t * t;
-                case EMarqueeEase.QuartOut:
+                case MarqueeEase.QuartOut:
                     return 1f - Mathf.Pow(1f - t, 4f);
-                case EMarqueeEase.QuartInOut:
+                case MarqueeEase.QuartInOut:
                     return t < 0.5f ? 8f * t * t * t * t : 1f - Mathf.Pow(-2f * t + 2f, 4f) / 2f;
 
-                case EMarqueeEase.QuintIn:
+                case MarqueeEase.QuintIn:
                     return t * t * t * t * t;
-                case EMarqueeEase.QuintOut:
+                case MarqueeEase.QuintOut:
                     return 1f - Mathf.Pow(1f - t, 5f);
-                case EMarqueeEase.QuintInOut:
+                case MarqueeEase.QuintInOut:
                     return t < 0.5f ? 16f * t * t * t * t * t : 1f - Mathf.Pow(-2f * t + 2f, 5f) / 2f;
 
-                case EMarqueeEase.ExpoIn:
+                case MarqueeEase.ExpoIn:
                     return Mathf.Approximately(t, 0f) ? 0f : Mathf.Pow(2f, 10f * t - 10f);
-                case EMarqueeEase.ExpoOut:
+                case MarqueeEase.ExpoOut:
                     return Mathf.Approximately(t, 1f) ? 1f : 1f - Mathf.Pow(2f, -10f * t);
-                case EMarqueeEase.ExpoInOut:
+                case MarqueeEase.ExpoInOut:
                     if (Mathf.Approximately(t, 0f)) {
                         return 0f;
                     }
@@ -250,33 +250,33 @@ namespace ZStudio.UniKit.UI {
 
                     return t < 0.5f ? Mathf.Pow(2f, 20f * t - 10f) / 2f : (2f - Mathf.Pow(2f, -20f * t + 10f)) / 2f;
 
-                case EMarqueeEase.CircIn:
+                case MarqueeEase.CircIn:
                     return 1f - Mathf.Sqrt(1f - t * t);
-                case EMarqueeEase.CircOut:
+                case MarqueeEase.CircOut:
                     return Mathf.Sqrt(1f - (t - 1f) * (t - 1f));
-                case EMarqueeEase.CircInOut:
+                case MarqueeEase.CircInOut:
                     return t < 0.5f
                         ? (1f - Mathf.Sqrt(1f - Mathf.Pow(2f * t, 2f))) / 2f
                         : (Mathf.Sqrt(1f - Mathf.Pow(-2f * t + 2f, 2f)) + 1f) / 2f;
 
-                case EMarqueeEase.BackIn:
-                    return c3 * t * t * t - c1 * t * t;
-                case EMarqueeEase.BackOut:
-                    return 1f + c3 * Mathf.Pow(t - 1f, 3f) + c1 * Mathf.Pow(t - 1f, 2f);
-                case EMarqueeEase.BackInOut:
+                case MarqueeEase.BackIn:
+                    return k_C3 * t * t * t - k_C1 * t * t;
+                case MarqueeEase.BackOut:
+                    return 1f + k_C3 * Mathf.Pow(t - 1f, 3f) + k_C1 * Mathf.Pow(t - 1f, 2f);
+                case MarqueeEase.BackInOut:
                     return t < 0.5f
-                        ? Mathf.Pow(2f * t, 2f) * ((c2 + 1f) * 2f * t - c2) / 2f
-                        : (Mathf.Pow(2f * t - 2f, 2f) * ((c2 + 1f) * (2f * t - 2f) + c2) + 2f) / 2f;
+                        ? Mathf.Pow(2f * t, 2f) * ((k_C2 + 1f) * 2f * t - k_C2) / 2f
+                        : (Mathf.Pow(2f * t - 2f, 2f) * ((k_C2 + 1f) * (2f * t - 2f) + k_C2) + 2f) / 2f;
 
-                case EMarqueeEase.ElasticIn:
+                case MarqueeEase.ElasticIn:
                     if (Mathf.Approximately(t, 0f))
                         return 0f;
 
                     if (Mathf.Approximately(t, 1f))
                         return 1f;
 
-                    return -Mathf.Pow(2f, 10f * t - 10f) * Mathf.Sin((t * 10f - 10.75f) * c4);
-                case EMarqueeEase.ElasticOut:
+                    return -Mathf.Pow(2f, 10f * t - 10f) * Mathf.Sin((t * 10f - 10.75f) * k_C4);
+                case MarqueeEase.ElasticOut:
                     if (Mathf.Approximately(t, 0f)) {
                         return 0f;
                     }
@@ -285,8 +285,8 @@ namespace ZStudio.UniKit.UI {
                         return 1f;
                     }
 
-                    return Mathf.Pow(2f, -10f * t) * Mathf.Sin((t * 10f - 0.75f) * c4) + 1f;
-                case EMarqueeEase.ElasticInOut:
+                    return Mathf.Pow(2f, -10f * t) * Mathf.Sin((t * 10f - 0.75f) * k_C4) + 1f;
+                case MarqueeEase.ElasticInOut:
                     if (Mathf.Approximately(t, 0f)) {
                         return 0f;
                     }
@@ -296,14 +296,14 @@ namespace ZStudio.UniKit.UI {
                     }
 
                     return t < 0.5f
-                        ? -(Mathf.Pow(2f, 20f * t - 10f) * Mathf.Sin((20f * t - 11.125f) * c5)) / 2f
-                        : Mathf.Pow(2f, -20f * t + 10f) * Mathf.Sin((20f * t - 11.125f) * c5) / 2f + 1f;
+                        ? -(Mathf.Pow(2f, 20f * t - 10f) * Mathf.Sin((20f * t - 11.125f) * k_C5)) / 2f
+                        : Mathf.Pow(2f, -20f * t + 10f) * Mathf.Sin((20f * t - 11.125f) * k_C5) / 2f + 1f;
 
-                case EMarqueeEase.BounceIn:
+                case MarqueeEase.BounceIn:
                     return 1f - BounceOut(1f - t);
-                case EMarqueeEase.BounceOut:
+                case MarqueeEase.BounceOut:
                     return BounceOut(t);
-                case EMarqueeEase.BounceInOut:
+                case MarqueeEase.BounceInOut:
                     return t < 0.5f
                         ? (1f - BounceOut(1f - 2f * t)) / 2f
                         : (1f + BounceOut(2f * t - 1f)) / 2f;
@@ -314,31 +314,31 @@ namespace ZStudio.UniKit.UI {
         }
 
         private static float BounceOut(float t) {
-            const float n1 = 7.5625f;
-            const float d1 = 2.75f;
+            const float k_N1 = 7.5625f;
+            const float k_D1 = 2.75f;
 
-            if (t < 1f / d1) {
-                return n1 * t * t;
+            if (t < 1f / k_D1) {
+                return k_N1 * t * t;
             }
 
-            if (t < 2f / d1) {
-                t -= 1.5f / d1;
-                return n1 * t * t + 0.75f;
+            if (t < 2f / k_D1) {
+                t -= 1.5f / k_D1;
+                return k_N1 * t * t + 0.75f;
             }
 
-            if (t < 2.5f / d1) {
-                t -= 2.25f / d1;
-                return n1 * t * t + 0.9375f;
+            if (t < 2.5f / k_D1) {
+                t -= 2.25f / k_D1;
+                return k_N1 * t * t + 0.9375f;
             }
 
-            t -= 2.625f / d1;
-            return n1 * t * t + 0.984375f;
+            t -= 2.625f / k_D1;
+            return k_N1 * t * t + 0.984375f;
         }
 
         /// <summary>
         /// 无缝环形复用：单元是否已沿流向完全滚出视口的“流出边”（其整体越过 +f 侧边界），应绕回入场端复用。
         /// </summary>
-        public static bool ContinuousUnitFullyExited(EMarqueeDirection dir, float center, float axisSize, float viewportAxis) {
+        public static bool ContinuousUnitFullyExited(MarqueeDirection dir, float center, float axisSize, float viewportAxis) {
             float f = FlowSign(dir);
             return f * center > viewportAxis * 0.5f + axisSize * 0.5f;
         }
