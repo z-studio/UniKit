@@ -1,250 +1,247 @@
 # UI Marquee
 
-基于 UGUI 的通用跑马灯（Marquee / Ticker）组件，**核心零第三方依赖**。单条内容支持**文本 / 图片 / Spine 的任意组合**（按片段水平排列），提供**逐条轮播**与**无缝连续滚动**两种模式，可配置滚动方向、停留时长、滚动速度、循环/单次播放、缓动曲线，并暴露开始/完成/点击等事件回调。内部使用 Unity 协程驱动；无缝模式采用**环形复用 + 对象池**，常驻对象数 ≈ 铺满视口所需，与条目总数无关。Spine 支持以**可选扩展程序集**提供，不引入时核心库仍保持零依赖。
+基于 UGUI 的跑马灯组件，适用于公告、消息轮播和动态信息展示。支持文本与图片混排、逐条轮播、无缝连续滚动，以及可选的 Spine 动画片段。
 
-## 依赖
-
-| 依赖 | 版本 | 必需 |
-| --- | --- | --- |
-| `com.unity.ugui` | 2.0.0 | 是 |
-| `com.esotericsoftware.spine.spine-unity` | 4.x | 否（仅使用 `SpineSegment` 时） |
-
-> 核心库仅依赖 UGUI（含 TextMeshPro），无需 UniTask / PrimeTween 等第三方库，`git url` 安装即可用。Spine 为**可选扩展**，不使用 `SpineSegment` 时无需安装，详见「Spine 扩展」。
+核心包依赖 Unity 6 和 UGUI（含 TextMeshPro），不需要 UniTask 或其他动画库。使用 Spine 或导入 Demo 时，需另外安装对应依赖。
 
 ## 安装
 
-- 将本包置于工程 `Packages/` 目录下，或
-- 通过 Package Manager 以本地路径 / Git URL 引入，或
-- 将包中的 Runtime 与 Editor 目录一并复制到工程 Assets 下，并保留程序集定义。
+在 Unity 的 Package Manager 中选择 **Add package from git URL**，输入：
 
-## 快速开始
+```text
+https://github.com/z-studio/UniKit.git?path=Packages/com.z-studio.unikit.ui.marquee
+```
 
-> **只想先看效果？** 无需任何搭建——直接导入下方「[示例](#示例)」中的 `Demo`，打开 `UIMarqueeDemo.unity` 运行即可（完全自包含，UI 与数据由代码生成）。想在自己场景里快速起步，也可给任意对象挂上示例里的 `UIMarqueeDemo` 组件，用其右键菜单 **Create Demo Marquees In Scene** 一键生成可编辑的跑马灯结构。
+也可以通过 **Add package from disk** 选择本目录中的 `package.json`。需要固定版本时，在 Git URL 后追加仓库中实际存在的标签或提交号。
 
-**从零手动搭建**（4 步）：
-
-1. 在 Canvas 下创建一个节点作为 **viewport**，建议挂载 `RectMask2D` 或 `Mask` 以裁剪溢出内容。
-2. 在 viewport 下放置 **contentTemplate** 节点，其下需至少包含一个 `Image` 或一个 `TextMeshProUGUI`。它**仅作样式模板**（字体、颜色、Image 属性等）使用，运行时会按片段克隆复用，自身不直接显示。
-3. 将 `Marquee` 组件挂到任意节点（默认会把自身 `RectTransform` 当作 viewport），并指定 `viewport` 与 `contentTemplate`。
-4. 在 Inspector 中填充 `items`，或运行时通过 API 设置。每条 item 的内容由 `segments` 列表组成——单个片段即「纯文本 / 纯图片」，多个片段即**文本+图片+Spine 的任意混排**（见下文）。
-
-## 滚动模式
-
-| 模式 | 说明 |
+| 依赖 | 用途 |
 | --- | --- |
-| `Sequential`（逐条轮播） | 按列表顺序逐条展示。内容未超过视口且 `centerWhenFit` 开启时居中停留 `displayDurationWhenFit` 秒；超过视口时贴边停留 `displayDurationBeforeScroll` 秒后匀速滚出，再播放下一条。受 `playMode`（Loop/Once）与每条目的 `cycles` 控制。 |
-| `Continuous`（无缝连续滚动） | 条目首尾相接匀速流动形成无缝跑马灯。忽略 `playMode`、`cycles`（除 `0` 表示禁用该条）、停留时长，仅使用 `scrollSpeed`、`spacing`、`direction`。采用**环形复用**：只创建“铺满视口 + 1 个待命”的单元，滚出流出边的单元绕回入场端并换下一条数据，**常驻对象数 ≈ 铺满视口所需，与条目总数无关**（20 条也可能只需几个）。单元经对象池复用，`Refresh()` / 重新 `Play()` 复用现有对象。 |
+| Unity 6000.0 或更新版本 | 核心组件及原生 `Awaitable` |
+| `com.unity.ugui` 2.0.0 | UGUI 与 TextMeshPro，由本包声明依赖 |
+| Spine Unity / Spine C# | 可选，仅用于 Spine 片段；当前扩展针对 Spine 4.2 API |
+| `com.unity.inputsystem` | 仅 Demo 需要，核心组件不依赖它 |
 
-## 方向
+## 先体验 Demo
 
-`direction` 支持 `Left` / `Right` / `Up` / `Down`，对两种模式均生效。运行时修改方向/间距会在下一帧自动更新；`scrollSpeed` 对 Continuous 模式每帧读取，无需 `Refresh`。
+1. 安装 Input System，并在项目中启用新输入系统或 Both。
+2. 在 Package Manager 中选中 **UI Marquee**，导入 **Samples > Demo**。
+3. 打开导入目录中的 `Scenes/Demo.unity`，进入播放模式。
 
-## 缓动（Sequential 专用）
+示例源码位于 [`Samples~/Demo`](Samples~/Demo)，用于在编辑器中体验两种滚动模式、四个方向、调速、暂停与恢复、动态追加和点击事件。界面及演示内容由 `UIMarqueeDemo` 构建。
 
-`ease` 控制逐条滚动的速度曲线，提供主流缓动全集（命名/公式遵循 [easings.net](https://easings.net)）：
+该组件还提供两个右键菜单：
 
-- `Linear`
-- `Sine` / `Quad` / `Cubic` / `Quart` / `Quint` / `Expo` / `Circ` 各 `In` / `Out` / `InOut`
-- `Back` / `Elastic` / `Bounce` 各 `In` / `Out` / `InOut`（Back、Elastic 可超出 `[0,1]`，Bounce 在范围内回弹；位移使用 `LerpUnclamped`）
-- `Custom`：使用 `customCurve`（`AnimationCurve`），横轴 `0→1` 为进度、纵轴 `0→1` 为位移比例，可自定义任意曲线（同样支持超出 `[0,1]` 的过冲）
+- **Create Demo Marquees In Scene**：预先生成可编辑的跑马灯节点，方便在 Inspector 中调整配置。
+- **Clear Demo Marquees In Scene**：清理生成的节点。
 
-> **仅 Sequential 模式生效**。Continuous（无缝连续滚动）为保证接缝处无跳变，始终保持匀速，忽略 `ease`。
+文本显示需要有效的 TMP 字体资源。使用中文内容时，请为模板指定包含对应字符的字体。
 
-## 条目配置（`MarqueeItemData`）
+## 在自己的场景中使用
+
+推荐层级：
+
+```text
+Canvas
+└─ MarqueeViewport       RectTransform + RectMask2D + Marquee
+   └─ ContentTemplate    样式模板
+      ├─ Text            TextMeshProUGUI
+      └─ Image           Image
+```
+
+1. 设置可视区域大小，并添加 `RectMask2D` 或 `Mask` 裁剪溢出内容。
+2. 在 `Marquee` 上指定 `Viewport` 和 `ContentTemplate`。`Viewport` 留空时使用组件自身的 `RectTransform`；模板留空时尝试使用视口的第一个子节点。
+3. 根据内容保留文本或图片模板，设置字体、颜色等样式。使用哪种内置片段，就需要对应模板；Spine 由自己的渲染器创建视图。
+4. 在 Inspector 的条目列表中添加内容，展开条目后通过“内容片段”的 `+` 添加片段，拖动手柄调整顺序。
+5. 开启 `PlayOnStart` 自动播放，或通过代码设置数据并启动。
+
+模板在运行时会隐藏，组件克隆并复用其片段视图；销毁组件时恢复模板原本的激活状态。模板应独立于组件所在节点，避免隐藏模板时同时禁用组件。
+
+## 模式与配置
+
+| 行为 | `Sequential` 逐条轮播 | `Continuous` 连续滚动 |
+| --- | --- | --- |
+| 展示方式 | 一次展示一条，结束后切换下一条 | 多条首尾相接、循环流动 |
+| `PlayMode` | `Loop` 循环遍历，`Once` 遍历一次 | 不使用 |
+| `Cycles` | 消耗每条内容的展示次数 | 只用 `0` 排除条目，其余都参与循环 |
+| 停留与居中 | 支持 | 不使用 |
+| 缓动 | 使用 `Ease` 或 `CustomCurve` | 始终匀速 |
+| 间距 | 使用片段间距 | 使用片段间距和条目间距 |
+
+两种模式均支持 `Left`、`Right`、`Up`、`Down`。无论整体朝哪个方向滚动，一条内容内部的片段始终从左到右排列、垂直居中。
 
 | 字段 | 说明 |
 | --- | --- |
-| `id` | 业务标识（可选），用于点击/事件回调中识别条目（如公告 ID、跳转链接）。 |
-| `segments` | **内容片段列表**：文本 / 图片 / Spine 等任意组合，按顺序水平排列、整体居中、各段垂直居中（见「内容片段与混排」）。单段即「纯文本 / 纯图片」。 |
-| `cycles` | 出现次数：`-1` 一直重复（默认），`0` 永不出现/禁用，`>0` 限定次数。运行时只消耗内部副本，**不会修改你传入的对象**。 |
+| `ScrollSpeed` | 滚动速度；逐条模式选择非线性缓动时，以此计算滚动时长 |
+| `SegmentSpacing` | 同一条内容内部的片段间距 |
+| `Spacing` | 连续模式的条目间距 |
+| `CenterWhenFit` | 逐条模式下，内容能放入视口时居中展示 |
+| `DisplayDurationWhenFit` | 居中展示的停留时长 |
+| `DisplayDurationBeforeScroll` | 需要滚动时，开始移动前的停留时长 |
+| `EdgeMargin` | 逐条滚动起点的边缘留白 |
+| `Ease` | 逐条滚动的缓动类型；`Custom` 使用 `CustomCurve` |
+| `CustomCurve` | 横轴为 0～1 的进度，纵轴为位移比例，可实现过冲 |
+| `PlayOnStart` | 在 `Start` 时自动播放已有条目 |
+| `IgnoreTimeScale` | 使用非缩放时间；Spine 及实现时间控制接口的扩展也会跟随 |
 
-> 内容只有 `segments` 一套模型，没有额外的 type/text/sprite 字段。最常用的单段场景可用便捷工厂：`MarqueeItemData.Text("文字", id, cycles)` / `MarqueeItemData.Image(sprite, id, cycles)`。
+关闭 `CenterWhenFit` 后，短内容也会滚动。尺寸、间距和速度使用 UI 本地单位，受 Canvas 缩放影响；停留时长以秒计。
 
-## 内容片段与混排（`segments`）
+## 条目与混排
 
-一条 item 由若干 **片段（`MarqueeSegment`）** 按顺序**水平排列**组成，相邻片段间距由 `segmentSpacing` 控制，整体水平居中、每段垂直居中。单个片段就是「纯文本 / 纯图片」，多个片段即混排。内置两种片段，Spine 片段由可选扩展提供：
+`MarqueeItemData` 表示一条内容：
 
-| 片段类型 | 程序集 | 字段 |
-| --- | --- | --- |
-| `MarqueeTextSegment` | 核心 | `text` |
-| `MarqueeImageSegment` | 核心 | `sprite`、`size`（为 0 时用 sprite 原始尺寸） |
-| `SpineSegment` | `ZStudio.UniKit.UI.Marquee.Spine`（可选） | `skeletonDataAsset`、`skinName`、`animationName`、`loop`、`timeScale`、`scale`、`size` |
+| 字段 | 说明 |
+| --- | --- |
+| `ID` | 可选的业务标识，用于事件中识别条目 |
+| `Segments` | 按显示顺序排列的片段列表 |
+| `Cycles` | `-1` 不限次数，`0` 跳过，正数限制展示次数 |
+
+`Cycles` 的剩余次数由组件单独维护，不会写回条目。`PlayMode.Once` 只遍历一次，不会为了用完正数次数再次循环；`Play()` 会重新初始化次数。
+
+内置 `MarqueeTextSegment` 使用 `Text` 字段；`MarqueeImageSegment` 使用 `Sprite` 和 `Size`。图片尺寸逐轴补齐：例如 `Size = (100, 0)` 保留指定宽度，高度取 Sprite 的原始高度。
+
+以下脚本可挂在已配置好模板的跑马灯节点上：
 
 ```csharp
+using System.Collections.Generic;
 using UnityEngine;
 using ZStudio.UniKit.UI;
 
-// 单段（便捷工厂）
-marquee.AddItem(MarqueeItemData.Text("欢迎来到游戏！", "welcome"));
-marquee.AddItem(MarqueeItemData.Image(iconSprite, "icon"));
+[RequireComponent(typeof(Marquee))]
+public class NoticeExample : MonoBehaviour {
+    [SerializeField] private Sprite m_Icon;
 
-// 混排：文本 + 图片 + Spine + 文本
-var item = new MarqueeItemData(
-    new MarqueeTextSegment("恭喜 "),
-    new MarqueeImageSegment(avatarSprite) { Size = new Vector2(48, 48) },
-    new SpineSegment {
-        skeletonDataAsset = crownAsset,
-        animationName = "idle",
-        loop = true,
-        size = new Vector2(64, 64),
-    },
-    new MarqueeTextSegment(" 荣获冠军！")
-) { ID = "honor_1" };
-marquee.AddItem(item);
-```
-
-- **Inspector 配置**：组件自带 `MarqueeItemData` 自定义抽屉——展开 `Items` 里的某条，在 **Segments** 列表点 `+` 会弹出类型下拉（`文本 / 图片 / Spine …`，Spine 仅在引入扩展后出现），选中即添加；列表项**可拖拽排序**，每条标题会显示内容摘要。单段即纯文本/纯图片，多段即混排。
-- **对象池**：片段视图按渲染器 `Key` 分类入池复用，混排同样享受环形复用 / 对象池，不会因混排而额外创建常驻对象。
-- **点击**：点击粒度为**整条 item**（回调返回该 item 与其 index），不区分点中的是哪个片段。`index` 在 **Sequential 与 Continuous 两种模式下均为该条目在 `items`（或 `SetItems` 传入列表）中的原始下标**，即使 Continuous 模式下跳过了 `cycles==0` / 零尺寸条目，回调下标仍对应原始列表，可直接用于反查。
-- **扩展自定义片段**：实现 `IMarqueeSegmentRenderer` 并在启动时调用 `MarqueeSegmentRendererRegistry.Register(...)`（建议放在 `[RuntimeInitializeOnLoadMethod]` 中），即可接入任意自定义内容类型。
-
-## Spine 扩展（可选）
-
-Spine 支持位于独立程序集 `ZStudio.UniKit.UI.Marquee.Spine`（`Runtime/Spine`），**核心库不依赖 Spine**：
-
-- **启用条件**：程序集通过 `defineConstraints: ["UI_MARQUEE_SPINE"]` 守卫，仅在该宏存在时参与编译。
-  - 通过 **UPM 包**（`com.esotericsoftware.spine.spine-unity`）安装 Spine 时，`versionDefines` 会**自动定义** `UI_MARQUEE_SPINE`，开箱即用。
-  - 若 Spine 是以 **`.unitypackage` 导入到 `Assets`**（非 UPM）安装的，请在 *Project Settings → Player → Scripting Define Symbols* 中**手动添加** `UI_MARQUEE_SPINE`。
-- **未安装 Spine 的工程**：宏不存在 → 扩展程序集整体不参与编译，**不会产生任何编译错误**，核心库照常零依赖运行。
-- **自动注册**：`SpineSegmentRenderer` 通过 `[RuntimeInitializeOnLoadMethod]` 在游戏启动时自动注册到 `MarqueeSegmentRendererRegistry`，业务侧无需手动接入；漏装扩展却使用了 `SpineSegment` 时，运行时会在绑定时打印找不到渲染器的警告。
-
-## 事件
-
-```csharp
-marquee.OnItemStart    += (item, index) => { /* 某条开始展示（Sequential） */ };
-marquee.OnItemComplete += (item, index) => { /* 某条展示/滚动完成（Sequential） */ };
-marquee.OnLoopComplete += () => { /* 完成一轮（Sequential + Loop） */ };
-marquee.OnAllComplete  += () => { /* 全部播放结束（Once 或无可播放条目） */ };
-marquee.OnItemClicked  += (item, index) => { /* 条目被点击；index 为原始 items 下标（两种模式一致） */ };
-```
-
-> 点击事件需要内容上的 `Graphic`（Image/Text）开启 `raycastTarget`，且场景中的 Canvas 含 `GraphicRaycaster`、场景含 `EventSystem`。若订阅了 `OnItemClicked` 却缺少 `GraphicRaycaster`，运行时会打印一次诊断警告。
-
-## 运行时 API
-
-```csharp
-public void Play(int startIndex = 0);          // 开始播放（每次重置 cycles 预算）
-public int  Stop();                            // 停止并返回当前索引
-public void Pause();                           // 暂停停留与滚动，片段动画继续播放
-public void Unpause();                         // 取消暂停
-public void Refresh();                         // 请求重新布局，保留播放次数与一次性等待
-public void SetItems(List<MarqueeItemData> items, bool startPlay = true);
-public void AddItem(MarqueeItemData item);     // 追加（不打断当前播放）
-public void AddItems(List<MarqueeItemData> items);
-public void PlayOnce(string text, Action onComplete = null);          // 一次性播放单条文字
-public void PlayOnce(MarqueeItemData item, Action onComplete = null); // 一次性播放单条内容
-
-// async 版本（Unity 6 Awaitable，可直接 await；被打断/取消时抛 OperationCanceledException）
-public Awaitable PlayOnceAsync(string text, CancellationToken ct = default);                // await 至单条文字播完
-public Awaitable PlayOnceAsync(MarqueeItemData item, CancellationToken ct = default);       // await 至单条播完
-public Awaitable PlaySequenceOnceAsync(int startIndex = 0, CancellationToken ct = default); // 以 Once 语义 await 至整个序列播完
-
-public bool IsPlaying { get; }
-public bool IsPaused  { get; }
-public int  CurrentIndex { get; }
-```
-
-### 示例
-
-```csharp
-using ZStudio.UniKit.UI;
-
-var items = new List<MarqueeItemData> {
-    MarqueeItemData.Text("欢迎来到游戏！", "welcome"),
-    MarqueeItemData.Text("限时活动进行中", "event_001", cycles: 3),
-};
-
-marquee.OnItemClicked += (item, _) => Debug.Log($"点击了公告：{item.ID}");
-marquee.SetItems(items); // 默认立即开始播放
-```
-
-### 异步编排（Awaitable）
-
-对**一次性 / 有明确终点**的播放，可用 `Awaitable` 版本把「等待完成」写成线性代码，替代事件订阅，串行编排更直观（Unity 6+）：
-
-```csharp
-using System.Threading;
-using ZStudio.UniKit.UI;
-
-// 依次播完 A、B，再执行后续逻辑——无需监听 onComplete 回调
-async Awaitable ShowIntroAsync(CancellationToken ct) {
-    try {
-        await marquee.PlayOnceAsync(MarqueeItemData.Text("第一条公告"), ct);
-        await marquee.PlayOnceAsync(MarqueeItemData.Text("第二条公告"), ct);
-        // 以 Once 语义把整列表播完（忽略 playMode=Loop）后再继续
-        await marquee.PlaySequenceOnceAsync(cancellationToken: ct);
-        Debug.Log("全部播放完成");
-    } catch (System.OperationCanceledException) {
-        // 被新的播放 / Stop() / 组件禁用或销毁 / ct 取消打断时进入这里
+    private void Start() {
+        var marquee = GetComponent<Marquee>();
+        marquee.SetItems(new List<MarqueeItemData> {
+            MarqueeItemData.Text("欢迎来到游戏！", "welcome"),
+            new MarqueeItemData(
+                new MarqueeImageSegment(m_Icon) { Size = new Vector2(32f, 32f) },
+                new MarqueeTextSegment("限时活动进行中")
+            ) { ID = "event", Cycles = 3 }
+        });
     }
 }
 ```
 
-> **说明**：`await` 仅适合「一次」；**循环、`Continuous` 无缝滚动、逐条进度通知**仍应使用事件（`OnItemStart` / `OnItemComplete` / `OnLoopComplete` / `OnItemClicked`）——它们表达的是「每一次」。两套接口可共存。被 `Stop()`、新的播放、组件禁用/销毁或传入的 `CancellationToken` 取消时，await 会抛 `OperationCanceledException`，不会悬挂。
+纯图片可用 `MarqueeItemData.Image(sprite, id, cycles)` 创建。`SetItems` 默认立即开始播放；只准备数据时传入 `startPlay: false`，稍后调用 `Play()`。
 
-## 示例
+## 播放控制
 
-示例位于包内 `Samples/Demo`。将该目录复制到工程 `Assets` 下，打开场景 `UIMarqueeDemo.unity` 即可运行——**完全自包含**，UI 与数据均在运行时由代码构建，无需任何额外资源或字体。该场景是一个**综合功能演示控制台**，覆盖组件的全部核心能力：
+| API | 行为 |
+| --- | --- |
+| `Play(startIndex = 0)` | 重新开始并重置次数；起始索引仅对逐条模式生效 |
+| `Stop()` | 停止调度，保留当前画面并返回当前索引 |
+| `Pause()` / `Unpause()` | 暂停、恢复停留计时与滚动，片段动画继续播放 |
+| `SetItems(newItems, startPlay = true)` | 停止旧播放、清空旧视图并替换列表；空列表保持停止 |
+| `AddItem(item)` / `AddItems(items)` | 追加内容，不取消当前播放；连续模式会重新布局 |
+| `Refresh()` | 请求重建布局，不重置剩余次数，也不取消一次性等待 |
+| `PlayOnce(text 或 item, onComplete)` | 打断当前播放，展示单条内容；正常结束时调用回调 |
+| `PlayOnceAsync(text 或 item, cancellationToken)` | 播放单条内容并等待结束 |
+| `PlaySequenceOnceAsync(startIndex = 0, cancellationToken = default)` | 在逐条模式下遍历列表一次，忽略 `PlayMode.Loop` |
 
-- **两条跑马灯**：顶部一条 `Sequential`（逐条轮播）、底部一条 `Continuous`（无缝连续滚动），均含**文本 + 图片混排**条目。
-- **Sequential 演示项**：缓动 `ease` 循环切换（Linear / QuadInOut / CubicOut / BackOut / ElasticOut / BounceOut）、`Loop` ⇄ `Once` 播放模式切换、`cycles` 限定次数（某条仅出现两次后被跳过）、短内容居中停留、`PlayOnce` 一次性播放（完成后自动恢复循环）。
-- **Continuous 演示项**：`scrollSpeed` 滑条**即时调速**、`spacing` 滑条 + `Apply (Refresh)` 可显式请求重新布局（间距也会自动生效）、运行时 `AddItem` 追加并 `Refresh`。
-- **全局控制**：四方向循环、暂停 / 恢复 / 停止 / 重播。
-- **事件**：订阅 `OnItemStart` / `OnItemComplete` / `OnLoopComplete` / `OnAllComplete` / `OnItemClicked` 全事件。
-- **界面**：全部用 **UGUI** 搭建（`Canvas` + `CanvasScaler` 按屏幕缩放，自适应不同分辨率）——左侧控制面板（按钮 / 滑条）提供上述全部运行时控制；事件回调输出到 **Console**。点击任意跑马灯内容可触发 `OnItemClicked`。
-- **可选：编辑期预创建**：选中挂有 `UIMarqueeDemo` 的对象，在其组件右键菜单选择 **Create Demo Marquees In Scene**，即可在**非运行时**生成两条可视跑马灯（`Canvas` + `viewport` + `contentTemplate` + 预填 `items`），随后在 Inspector 中自定义配置；进入 Play 时示例会自动**复用**这两条跑马灯及其配置，而非重新构建。**Clear Demo Marquees In Scene** 可移除它们（均支持 Undo）。
+`IsPlaying`、`IsPaused` 可用于查询状态。`CurrentIndex` 用于读取逐条序列的当前索引，不用于查询连续模式或 `PlayOnce` 的当前内容。
 
-## 设计说明
+单条 `PlayOnce` 不消耗条目的 `Cycles`，也不会自动恢复此前的序列。需要恢复时，在完成回调中主动调用 `Play()`。新播放请求会打断旧播放，被打断的 `PlayOnce` 不调用完成回调。
 
-- **核心零依赖**：协程 + 自带插值，不依赖任何第三方库；Spine 等富内容以可选扩展程序集接入，不引入时核心库不受影响。
-- **混排可扩展**：单条内容由片段列表组成，文本/图片内置、Spine 等通过 `IMarqueeSegmentRenderer` + 注册表接入，可自定义任意片段类型；混排同样走环形复用 / 对象池。
-- **重入安全**：每次 `Play` 取消上一次播放（运行版本号 + `StopCoroutine`），不会出现多个循环并发；`PlayOnce` 被打断时不会回调 `onComplete`。
-- **数据不被污染**：`cycles` 的剩余次数在内部副本中维护，运行时不会修改你传入的 `MarqueeItemData`。
-- **暂停语义**：`Pause` 冻结停留计时与滚动，片段动画继续播放，适合停下来查看动态内容。
-- **生命周期安全**：禁用 GameObject 时自动停止并记录状态，重新启用后恢复播放。
-- **环形复用（Continuous）**：`MarqueeRingLayout` 独立维护逻辑条目及周期内偏移；显示层按每次出现的编号复用视图。大步长即使跨过全部已实例化内容，也会定位到正确条目和剩余偏移。仅创建当前窗口所需的单元及入口待命单元。
-- **首帧兜底**：`viewport` 宽度尚未完成布局（为 0）时会等待若干帧，避免首条计算错误。
-- **易于测试**：核心几何/索引逻辑位于 `MarqueeMath` 和 `MarqueeRingLayout`，不依赖运行时状态，可直接编写 EditMode 单元测试验证。
+### 异步等待
 
-## 更新与生命周期
+下面的方法接收已经配置好的组件，依次播放两条消息：
 
-- `Play()` 表示重新播放，会重置次数预算；`Refresh()` 只请求重新布局，不重置预算、不取消一次性等待。
-- Sequential 的方向、视口尺寸、速度与间距变化会自动反映到后续帧；Continuous 的方向、间距变化及追加条目会触发自动重铺，重铺可能改变当前可见位置。
-- 修改条目对象内部的片段内容后调用 `Refresh()`；直接修改 Inspector 的 `Items` 不会替换运行中的列表，请使用 `SetItems()`。
-- `SetItems()` 停止旧播放并清空旧视图。空列表保持停止；非空列表由 `startPlay` 决定是否启动。
-- 禁用后重新启用会从当前条重新展示，但保留剩余次数；一次性播放被取消，不自动恢复。
-- 取消令牌可以从后台线程触发；停止协程与完成取消等待统一在后续主线程更新中处理。
-- 渲染器 Key 必须唯一，不能使用 `builtin.` 前缀。注册表在每次进入播放模式时清空，扩展应在 `BeforeSceneLoad` 阶段重新注册。
-- 组件销毁时回收自己的视图并恢复模板激活状态，不修改原始 TMP 模板的换行/溢出设置。
-- 尺寸、间距与速度使用 UI 本地单位，受 Canvas 缩放影响，并非屏幕物理像素。
+```csharp
+using System;
+using System.Threading;
+using UnityEngine;
+using ZStudio.UniKit.UI;
 
+public static class NoticeSequence {
+    public static async Awaitable ShowAsync(Marquee marquee, CancellationToken token) {
+        try {
+            await marquee.PlayOnceAsync("第一条公告", token);
+            await marquee.PlayOnceAsync("第二条公告", token);
+        } catch (OperationCanceledException) {
+            // 新播放、Stop、禁用、销毁或取消令牌会打断等待。
+        }
+    }
+}
+```
 
-## 内部职责与扩展约定
+`PlaySequenceOnceAsync` 仅用于 `Sequential`；在 `Continuous` 下调用会记录警告并立即返回已完成的等待，不会等待连续滚动结束。渲染器在播放绑定过程中抛出的异常会传递给所属异步等待。
 
-- `Marquee`：Inspector 配置、公共 API、条目选择与模式调度。
-- `MarqueePlayback`：每次播放独立持有协程、取消注册与等待结果，统一处理完成、失败和重入。
-- `MarqueeContentLayout`：片段测量、水平布局、对象池与资源回收。绑定失败会销毁半绑定视图；回收失败不会阻断其它视图的清理。
-- `MarqueeRingLayout`：不依赖 Unity 对象的环形进度和窗口几何，可独立测试。
+### 运行时修改与生命周期
 
-所有渲染器都实现 `IMarqueeSegmentRenderer`，统一通过以下入口绑定内容：
+- 调整速度无需 `Refresh()`。方向、间距等配置会在播放循环中更新；连续模式重新布局时可见位置可能变化。
+- 修改条目对象内部的文本、图片或片段后，调用 `Refresh()`。它会重新绑定当前内容，片段动画也可能重新开始。
+- `SetItems` 复制列表容器，但不深拷贝条目。直接修改 Inspector 的 `Items` 列表结构不会替换运行列表，应使用 `SetItems`。
+- 普通播放在禁用后记录恢复点，重新启用时保留剩余次数并重新开始展示；不保证从原滚动位置继续。一次性播放被取消后不自动恢复。
+- `Stop` 和仅禁用 `Marquee` 组件都不会冻结仍可见的片段动画；禁用整个 GameObject 时动画随层级停止。
+- 播放和配置 API 应在 Unity 主线程调用。取消令牌可以从后台线程触发，组件会在主线程更新中处理。
+
+## 事件与点击
+
+| 事件 | 触发时机 |
+| --- | --- |
+| `OnItemStart(item, index)` | 逐条序列开始展示某条内容 |
+| `OnItemComplete(item, index)` | 逐条序列完成某条内容 |
+| `OnLoopComplete()` | 逐条循环从列表尾部转回前部 |
+| `OnAllComplete()` | 逐条序列自然结束，或连续模式没有有效内容 |
+| `OnItemClicked(item, index)` | 内容中的可点击 Graphic 收到点击 |
+
+单条 `PlayOnce` 不发送序列的开始、完成事件，应使用其完成回调或异步等待。连续模式不发送逐条进度事件。
+
+点击粒度是整条内容，不区分片段。序列播放的 `index` 对应运行列表的原始下标，即使连续模式跳过了禁用条目也保持一致；单条 `PlayOnce` 的点击索引为 `0`。
+
+点击需要 Canvas 上的 `GraphicRaycaster`、场景中的 `EventSystem` 及合适的输入模块，并开启片段 Graphic 的 `raycastTarget`。业务侧应在适当生命周期中取消事件订阅。
+
+## Spine 扩展
+
+Spine 支持位于独立程序集 `ZStudio.UniKit.UI.Marquee.Spine`。通过 UPM 安装 `com.esotericsoftware.spine.spine-unity` 后，程序集会自动启用，并在启动时注册渲染器。
+
+通过 `.unitypackage` 安装时，需要手动添加 `UI_MARQUEE_SPINE` 编译宏，并确保工程提供 `spine-unity`、`spine-csharp` 两个程序集。业务脚本使用 `SpineSegment` 时也需引用本包的 Spine 扩展程序集。
+
+| 字段 | 说明 |
+| --- | --- |
+| `SkeletonDataAsset` | 骨骼数据资产 |
+| `SkinName` | 皮肤名，留空使用默认皮肤 |
+| `AnimationName` | 动画名，留空保持初始姿势 |
+| `PlayWhenFullyVisible` | 默认开启，布局矩形进入视口后开始动画；某轴大于视口时，该轴以重叠作为条件 |
+| `Loop` / `TimeScale` | 动画循环与速度倍率 |
+| `Scale` | 骨骼整体缩放，同时影响布局占位 |
+| `Size` | 缩放前的布局尺寸，非正分量取初始姿势（setup pose）的包围盒尺寸 |
+
+最终占位为 `Size × abs(Scale)`。渲染器通过独立子节点补偿骨骼原点偏移；播放中超出初始包围盒的动画不会自动触发布局变化，可通过 `Size` 预留空间。
+
+## 自定义片段
+
+1. 创建带 `[Serializable]` 的 `MarqueeSegment` 子类。要在 Inspector 的添加菜单中出现，还需具有公共无参构造函数。
+2. 实现 `IMarqueeSegmentRenderer`，负责创建、绑定和回收视图。
+3. 在 `RuntimeInitializeLoadType.BeforeSceneLoad` 阶段调用 `MarqueeSegmentRendererRegistry.Register` 注册渲染器。
+
+所有渲染器使用同一个绑定入口：
 
 ```csharp
 Vector2 Bind(RectTransform view, MarqueeSegment segment, MarqueeRenderContext context);
 ```
 
-`context` 提供 `Viewport`、`IsMeasuring` 和 `IgnoreTimeScale`。文本、图片等静态内容可忽略不需要的字段；动画片段应区分测量与实际播放。只有以下两项能力需要按需实现额外接口：
+`context` 提供 `Viewport`、`IsMeasuring`、`IgnoreTimeScale`。`Bind` 必须覆盖旧内容，并返回包含缩放后的最终布局尺寸。测量和实际显示应返回相同尺寸；`IsMeasuring` 为 `true` 时不得启动动画或触发业务事件。
 
-| 接口 | 用途 |
+以下能力按需实现，无需为静态片段添加动画控制逻辑：
+
+| 可选接口 | 用途 |
 | --- | --- |
-| `IMarqueeSegmentMeasurer` | 无需创建视图即可返回布局尺寸；适合图片等静态片段 |
-| `IMarqueeSegmentTimeControl` | 在时间模式切换时同步动画的 scaled/unscaled 时间策略 |
+| `IMarqueeSegmentMeasurer` | 直接测量数据，省去隐藏视图绑定 |
+| `IMarqueeSegmentTimeControl` | 在 `IgnoreTimeScale` 改变时同步片段的时间模式 |
 
-测量和显示绑定必须返回一致的布局尺寸。未实现无视图测量的渲染器会在隐藏视图上调用同一个 `Bind`，此时 `context.IsMeasuring` 为 `true`，不得启动动画或业务事件。核心无需识别具体片段类型。
+未提供独立测量接口时，组件会在隐藏视图上调用 `Bind`。视图由组件管理和复用，渲染器不要自行销毁正常绑定的视图。`OnRecycle` 应清理自有动画、订阅和业务引用；`CreateView` 失败时应自行清理尚未返回的资源。
 
-视图由组件持有，渲染器不要自行销毁正常绑定的视图。`CreateView` 抛异常前应自行清理尚未返回的资源。`Bind` 必须覆盖上一次内容的显示状态；`OnRecycle` 应停止动画、取消自有订阅并释放业务引用。对象池键对应的视图结构应保持稳定。
+注册键 `Key` 必须稳定且唯一，不得使用保留前缀 `builtin.`。注册表在每次进入播放模式时清空，扩展需要重新注册；同一个渲染器可能服务多个 Marquee 实例，应将每个视图的状态保存在视图自身。
 
-`Pause` / `Unpause` 只影响滚动和停留，`Stop` 停止播放调度并保留当前画面；它们均不冻结仍可见的片段动画。禁用整个 GameObject 时动画随层级停止；仅禁用 Marquee 组件不会禁用子节点动画。`IgnoreTimeScale` 同时控制滚动和实现时间接口的片段（包括 Spine），自定义渲染器可选择接入。
+## 代码导览
 
-Spine 使用居中的布局根节点与绘制子节点。`Size` 是缩放前的布局尺寸，非正分量取 setup pose 包围盒尺寸；最终占位乘以 `abs(Scale)`。骨骼原点的偏移由子节点补偿。动画播放中超出 setup pose 的运动范围不自动重排，可通过 `Size` 预留空间。图片的 `Size.x`、`Size.y` 则分别补齐，不覆盖已经指定的轴。
-
-回归测试位于 `Tests/Editor`；`Tests/Spine` 仅在安装 Spine 后启用，覆盖缩放、偏心骨骼与测量不启动动画的约定。
+| 文件 | 职责 |
+| --- | --- |
+| [`Marquee.cs`](Runtime/Marquee.cs) | 配置入口、条目选择与模式调度 |
+| [`MarqueePlayback.cs`](Runtime/MarqueePlayback.cs) | 播放会话、取消、完成与异常处理 |
+| [`MarqueeContentLayout.cs`](Runtime/MarqueeContentLayout.cs) | 内容测量、水平布局和视图池 |
+| [`MarqueeRingLayout.cs`](Runtime/MarqueeRingLayout.cs) | 独立于视图的连续滚动进度与几何布局 |
+| [`MarqueeMath.cs`](Runtime/MarqueeMath.cs) | 方向、索引和缓动计算 |
+| [`SpineSegmentRenderer.cs`](Runtime/Spine/SpineSegmentRenderer.cs) | Spine 绑定、占位与播放控制 |
