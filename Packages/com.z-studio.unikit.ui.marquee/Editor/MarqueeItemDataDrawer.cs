@@ -17,14 +17,14 @@ namespace ZStudio.UniKit.UI.Editor {
         private const float k_BadgeW = 48f; // 左侧类型名标签宽度
 
         // 所有可实例化的片段子类（含扩展程序集里的 SpineSegment，按需自动出现）
-        // 用 [InitializeOnLoadMethod] 在每次 Domain Reload 后重置，兼容"关闭 Domain Reload"模式
+        // 脚本重新加载后清除类型缓存，以发现新增或移除的扩展类型。
         private static List<Type> s_SegmentTypes;
 
         [UnityEditor.Callbacks.DidReloadScripts]
         private static void OnScriptsReloaded() => s_SegmentTypes = null;
 
         // 每个属性路径一个 ReorderableList（保留展开/拖拽/选中状态）
-        private readonly Dictionary<string, ReorderableList> m_Lists = new();
+        private readonly Dictionary<string, (SerializedObject Owner, ReorderableList List)> m_Lists = new();
 
         private static List<Type> SegmentTypes {
             get {
@@ -32,7 +32,8 @@ namespace ZStudio.UniKit.UI.Editor {
                     s_SegmentTypes = new List<Type>();
 
                     foreach (Type t in TypeCache.GetTypesDerivedFrom<MarqueeSegment>()) {
-                        if (!t.IsAbstract && !t.IsGenericType && t.GetConstructor(Type.EmptyTypes) != null) {
+                        if (!t.IsAbstract && !t.IsGenericType && t.IsDefined(typeof(SerializableAttribute), false)
+                            && t.GetConstructor(Type.EmptyTypes) != null) {
                             s_SegmentTypes.Add(t);
                         }
                     }
@@ -47,49 +48,58 @@ namespace ZStudio.UniKit.UI.Editor {
         public override void OnGUI(Rect pos, SerializedProperty property, GUIContent label) {
             EditorGUI.BeginProperty(pos, label, property);
 
-            float line = EditorGUIUtility.singleLineHeight;
-            float y = pos.y;
+            try {
+                float line = EditorGUIUtility.singleLineHeight;
+                float y = pos.y;
+                bool multiple = property.serializedObject.isEditingMultipleObjects;
 
-            if (property.serializedObject.isEditingMultipleObjects) {
-                EditorGUI.HelpBox(new Rect(pos.x, y, pos.width, line * 2f),
-                    "多选编辑下不支持配置 segments（SerializeReference 限制）。请单独选中一个对象编辑。", MessageType.Info);
-                EditorGUI.EndProperty();
-                return;
-            }
+                var foldoutRect = new Rect(pos.x, y, pos.width, line);
+                
+                property.isExpanded = EditorGUI.Foldout(foldoutRect, property.isExpanded,
+                    multiple ? label : BuildSummary(property), true);
+                
+                y += line + k_Pad;
 
-            var foldoutRect = new Rect(pos.x, y, pos.width, line);
-            property.isExpanded = EditorGUI.Foldout(foldoutRect, property.isExpanded, BuildSummary(property), true);
-            y += line + k_Pad;
+                if (!property.isExpanded) {
+                    return;
+                }
 
-            if (property.isExpanded) {
                 SerializedProperty idProp = property.FindPropertyRelative("ID");
                 EditorGUI.PropertyField(new Rect(pos.x, y, pos.width, line), idProp);
                 y += line + k_Pad;
 
-                SerializedProperty segs = property.FindPropertyRelative("Segments");
-                ReorderableList rl = GetList(property, segs);
-                float h = rl.GetHeight();
+                if (multiple) {
+                    EditorGUI.HelpBox(new Rect(pos.x, y, pos.width, line * 2f),
+                        "片段列表暂不支持多选编辑，请单独选中对象配置。", MessageType.Info);
+                    
+                    y += line * 2f + k_Pad;
+                } else {
+                    SerializedProperty segs = property.FindPropertyRelative("Segments");
+                    ReorderableList rl = GetList(property, segs);
+                    float h = rl.GetHeight();
 
-                // 列表用全宽绘制，并把 indent 归零，避免在拖拽手柄列左侧再叠加缩进空白
-                int prevIndent = EditorGUI.indentLevel;
-                EditorGUI.indentLevel = 0;
-                rl.DoList(new Rect(pos.x, y, pos.width, h));
-                EditorGUI.indentLevel = prevIndent;
-                y += h + k_Pad;
+                    // 列表使用全宽；即使扩展字段绘制失败，也要恢复后续 Inspector 的缩进。
+                    int prevIndent = EditorGUI.indentLevel;
+                    
+                    try {
+                        EditorGUI.indentLevel = 0;
+                        rl.DoList(new Rect(pos.x, y, pos.width, h));
+                    } finally {
+                        EditorGUI.indentLevel = prevIndent;
+                    }
+                    
+                    y += h + k_Pad;
+                }
 
                 SerializedProperty cyclesProp = property.FindPropertyRelative("Cycles");
                 EditorGUI.PropertyField(new Rect(pos.x, y, pos.width, line), cyclesProp);
+            } finally {
+                EditorGUI.EndProperty();
             }
-
-            EditorGUI.EndProperty();
         }
 
         public override float GetPropertyHeight(SerializedProperty property, GUIContent label) {
             float line = EditorGUIUtility.singleLineHeight;
-
-            if (property.serializedObject.isEditingMultipleObjects) {
-                return line * 2f;
-            }
 
             float h = line + k_Pad; // foldout
 
@@ -99,8 +109,12 @@ namespace ZStudio.UniKit.UI.Editor {
 
             h += line + k_Pad; // id
 
-            SerializedProperty segs = property.FindPropertyRelative("Segments");
-            h += GetList(property, segs).GetHeight() + k_Pad; // segments
+            if (property.serializedObject.isEditingMultipleObjects) {
+                h += line * 2f + k_Pad; // 仅片段列表显示多选提示
+            } else {
+                SerializedProperty segs = property.FindPropertyRelative("Segments");
+                h += GetList(property, segs).GetHeight() + k_Pad;
+            }
 
             h += line; // cycles
 
@@ -112,48 +126,44 @@ namespace ZStudio.UniKit.UI.Editor {
         private ReorderableList GetList(SerializedProperty property, SerializedProperty segs) {
             string key = property.serializedObject.targetObject.GetInstanceID() + "::" + property.propertyPath;
 
-            if (m_Lists.TryGetValue(key, out ReorderableList rl)) {
-                // 检查持有的 SerializedObject 是否仍有效（关闭 Domain Reload 时对象可能已被销毁）
-                if (rl.serializedProperty?.serializedObject?.targetObject == null) {
-                    m_Lists.Remove(key);
-                } else {
-                    rl.serializedProperty = segs;
-                    return rl;
-                }
+            // 不读取缓存属性来判断有效性：它可能已被 Dispose。
+            // SerializedObject 更换时重建列表，避免内部仍持有旧的序列化上下文。
+            if (m_Lists.TryGetValue(key, out var cached)
+                && ReferenceEquals(cached.Owner, property.serializedObject)) {
+                cached.List.serializedProperty = segs;
+                return cached.List;
             }
 
-            rl = new ReorderableList(property.serializedObject, segs, true, true, true, true) {
+            var rl = new ReorderableList(property.serializedObject, segs, true, true, true, true) {
                 drawHeaderCallback = r =>
-                    EditorGUI.LabelField(r, "Segments（按序水平排列：文本 / 图片 / Spine …）"),
-
-                elementHeightCallback = i => ElementHeight(segs.GetArrayElementAtIndex(i)),
-
-                drawElementCallback = (r, i, _, _) => DrawElement(r, segs.GetArrayElementAtIndex(i)),
-
-                drawElementBackgroundCallback = (r, i, active, focused) => {
-                    if (Event.current.type != EventType.Repaint) {
-                        return;
-                    }
-                    
-                    // 奇偶交替底色（幅度轻微，适配亮/暗两种皮肤）
-                    Color bg = i % 2 == 0
-                        ? new Color(0f, 0f, 0f, EditorGUIUtility.isProSkin ? 0.12f : 0.04f)
-                        : new Color(1f, 1f, 1f, EditorGUIUtility.isProSkin ? 0.06f : 0.08f);
-                    EditorGUI.DrawRect(r, bg);
-                    
-                    // 选中/激活高亮叠加
-                    if (active) {
-                        EditorGUI.DrawRect(r, new Color(0.24f, 0.49f, 0.91f, 0.25f));
-                    }
-                },
-
-                onAddDropdownCallback = (_, _) => ShowAddMenu(segs),
-
-                drawNoneElementCallback = r =>
-                    EditorGUI.LabelField(r, "空：点「+」添加文本 / 图片 / Spine 片段"),
+                    EditorGUI.LabelField(r, "Segments（按序水平排列：文本 / 图片 / Spine …）")
             };
 
-            m_Lists[key] = rl;
+            // 回调始终读取本轮绑定的属性，不能捕获创建列表时的 segs。
+            rl.elementHeightCallback = i => ElementHeight(rl.serializedProperty.GetArrayElementAtIndex(i));
+            rl.drawElementCallback = (r, i, _, _) => DrawElement(r, rl.serializedProperty.GetArrayElementAtIndex(i));
+            
+            rl.drawElementBackgroundCallback = (r, i, active, focused) => {
+                if (Event.current.type != EventType.Repaint) {
+                    return;
+                }
+
+                Color bg = i % 2 == 0
+                    ? new Color(0f, 0f, 0f, EditorGUIUtility.isProSkin ? 0.12f : 0.04f)
+                    : new Color(1f, 1f, 1f, EditorGUIUtility.isProSkin ? 0.06f : 0.08f);
+                
+                EditorGUI.DrawRect(r, bg);
+
+                if (active) {
+                    EditorGUI.DrawRect(r, new Color(0.24f, 0.49f, 0.91f, 0.25f));
+                }
+            };
+            
+            rl.onAddDropdownCallback = (_, list) => ShowAddMenu(list.serializedProperty);
+            rl.drawNoneElementCallback = r =>
+                EditorGUI.LabelField(r, "空：点「+」添加文本 / 图片 / Spine 片段");
+
+            m_Lists[key] = (property.serializedObject, rl);
             return rl;
         }
 
@@ -176,27 +186,19 @@ namespace ZStudio.UniKit.UI.Editor {
                     break;
                 }
 
+                // 首字段与类型标签同行，但仍保留属性 Drawer 和嵌套字段所需的高度。
+                GUIContent fieldLabel = isFirst ? GUIContent.none : new GUIContent(it.displayName, it.tooltip);
+                float fh = EditorGUI.GetPropertyHeight(it, fieldLabel, true);
+                
                 if (isFirst) {
-                    isFirst = false;
-                    // 第一个字段强制单行、直接绘制，彻底绕过 TextAreaDrawer 内部保留的 label 行空白。
-                    // string → TextField；其它 → 无 label 的单行 PropertyField。
                     EditorGUI.LabelField(new Rect(r.x, y, k_BadgeW, line), label, EditorStyles.boldLabel);
-                    var fieldRect = new Rect(r.x + k_BadgeW, y, r.width - k_BadgeW, line);
-                   
-                    if (it.propertyType == SerializedPropertyType.String) {
-                        EditorGUI.BeginChangeCheck();
-                        string v = EditorGUI.TextField(fieldRect, it.stringValue);
-                        if (EditorGUI.EndChangeCheck()) it.stringValue = v;
-                    } else {
-                        EditorGUI.PropertyField(fieldRect, it, GUIContent.none);
-                    }
-                    
-                    y += line + k_Field;
-                } else {
-                    float fh = EditorGUI.GetPropertyHeight(it, true);
-                    EditorGUI.PropertyField(new Rect(r.x + k_BadgeW, y, r.width - k_BadgeW, fh), it, true);
-                    y += fh + k_Field;
+                    isFirst = false;
                 }
+                
+                EditorGUI.PropertyField(new Rect(r.x + k_BadgeW, y, r.width - k_BadgeW, fh),
+                    it, fieldLabel, true);
+                
+                y += fh + k_Field;
             }
 
             if (isFirst) {
@@ -221,10 +223,9 @@ namespace ZStudio.UniKit.UI.Editor {
 
                 any = true;
                 
-                // 与 DrawElement 一致：第一个字段固定单行高度
-                float fh = isFirst
-                    ? EditorGUIUtility.singleLineHeight
-                    : EditorGUI.GetPropertyHeight(it, true);
+                // 标签和 includeChildren 必须与绘制端一致，否则扩展 Drawer 会出现高度偏差。
+                GUIContent fieldLabel = isFirst ? GUIContent.none : new GUIContent(it.displayName, it.tooltip);
+                float fh = EditorGUI.GetPropertyHeight(it, fieldLabel, true);
                 
                 isFirst = false;
                 h += fh + k_Field;
@@ -238,6 +239,9 @@ namespace ZStudio.UniKit.UI.Editor {
         }
 
         private static void ShowAddMenu(SerializedProperty segs) {
+            // 菜单回调延后执行，不能继续使用本次 Inspector 绘制的属性句柄。
+            UnityEngine.Object target = segs.serializedObject.targetObject;
+            string path = segs.propertyPath;
             var menu = new GenericMenu();
             List<Type> types = SegmentTypes;
 
@@ -246,11 +250,25 @@ namespace ZStudio.UniKit.UI.Editor {
             } else {
                 foreach (Type t in types) {
                     Type captured = t;
+                    
                     menu.AddItem(new GUIContent(FriendlyName(captured.Name)), false, () => {
-                        segs.serializedObject.Update();
-                        segs.InsertArrayElementAtIndex(segs.arraySize);
-                        segs.GetArrayElementAtIndex(segs.arraySize - 1).managedReferenceValue = Activator.CreateInstance(captured);
-                        segs.serializedObject.ApplyModifiedProperties();
+                        if (target == null) {
+                            return;
+                        }
+
+                        using var serialized = new SerializedObject(target);
+                        SerializedProperty current = serialized.FindProperty(path);
+                        
+                        if (current == null || !current.isArray) {
+                            return;
+                        }
+
+                        // 先实例化，构造失败时不改变数组结构。
+                        object segment = Activator.CreateInstance(captured);
+                        int index = current.arraySize;
+                        current.InsertArrayElementAtIndex(index);
+                        current.GetArrayElementAtIndex(index).managedReferenceValue = segment;
+                        serialized.ApplyModifiedProperties();
                     });
                 }
             }
@@ -281,11 +299,13 @@ namespace ZStudio.UniKit.UI.Editor {
         private static string FriendlyName(string typeName) {
             string n = typeName;
 
-            if (n.StartsWith("Marquee", StringComparison.Ordinal))
+            if (n.StartsWith("Marquee", StringComparison.Ordinal)) {
                 n = n["Marquee".Length..];
+            }
 
-            if (n.EndsWith("Segment", StringComparison.Ordinal) && n.Length > "Segment".Length)
+            if (n.EndsWith("Segment", StringComparison.Ordinal) && n.Length > "Segment".Length) {
                 n = n[..^"Segment".Length];
+            }
 
             return n;
         }
