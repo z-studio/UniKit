@@ -148,6 +148,10 @@ namespace ZStudio.UniKit.UI {
                 return -1;
             }
 
+            if (from < -1 || from >= count) {
+                throw new System.ArgumentOutOfRangeException(nameof(from), "索引必须为 -1 或列表中的有效下标。");
+            }
+
             for (int step = 1; step <= count; step++) {
                 int idx = from + step;
 
@@ -184,7 +188,7 @@ namespace ZStudio.UniKit.UI {
         }
 
         /// <summary>
-        /// 计算缓动后的进度（输入裁剪到 [0,1]；Back/Elastic/Bounce 输出可超出 [0,1] 形成过冲/回弹）。
+        /// 计算缓动后的进度（输入裁剪到 [0,1]；Back/Elastic 输出可超出 [0,1] 形成过冲/回弹）。
         /// 公式遵循 easings.net，无外部依赖。Custom 无曲线信息，按线性返回（由调用方用 AnimationCurve 处理）。
         /// </summary>
         public static float Evaluate(MarqueeEase ease, float t) {

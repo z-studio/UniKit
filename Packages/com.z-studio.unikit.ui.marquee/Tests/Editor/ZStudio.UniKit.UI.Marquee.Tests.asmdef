@@ -1,0 +1,6 @@
+{
+  "name": "ZStudio.UniKit.UI.Marquee.Tests",
+  "references": ["ZStudio.UniKit.UI.Marquee", "UnityEngine.UI"],
+  "includePlatforms": ["Editor"],
+  "optionalUnityReferences": ["TestAssemblies"]
+}

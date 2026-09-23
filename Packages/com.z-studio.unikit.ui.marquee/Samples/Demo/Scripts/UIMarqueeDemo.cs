@@ -33,10 +33,10 @@ namespace ZStudio.UIMarquee.Samples {
         public float spacing = 60f;
 
         [Tooltip("Sequential 跑马灯。留空则运行时自动创建；也可用右键菜单「Create Demo Marquees In Scene」在编辑器预先生成后自定义配置。")]
-        [SerializeField] private UniKit.UI.UIMarquee m_Sequential;
+        [SerializeField] private UniKit.UI.Marquee m_Sequential;
 
         [Tooltip("Continuous 跑马灯。留空则运行时自动创建；也可用右键菜单预先生成。")]
-        [SerializeField] private UniKit.UI.UIMarquee m_Continuous;
+        [SerializeField] private UniKit.UI.Marquee m_Continuous;
 
         private Sprite m_DemoSprite;
         private Sprite m_RoundSprite; // UI 控件背景（圆角由纯色代替，保持零资源依赖）
@@ -131,7 +131,7 @@ namespace ZStudio.UIMarquee.Samples {
         }
 
         // Sequential 细化：演示居中停留、缓动、Loop 播放
-        private void ConfigureSequentialDefaults(UniKit.UI.UIMarquee marquee) {
+        private void ConfigureSequentialDefaults(UniKit.UI.Marquee marquee) {
             marquee.CenterWhenFit = true;
             marquee.DisplayDurationWhenFit = 1.5f;
             marquee.DisplayDurationBeforeScroll = 0.4f;
@@ -373,7 +373,7 @@ namespace ZStudio.UIMarquee.Samples {
         // 跑马灯构建
         // ------------------------------------------------------------------
 
-        private UniKit.UI.UIMarquee BuildMarquee(
+        private UniKit.UI.Marquee BuildMarquee(
             Transform parent,
             string name,
             float anchoredX,
@@ -415,7 +415,7 @@ namespace ZStudio.UIMarquee.Samples {
             text.alignment = TextAlignmentOptions.Left;
             text.raycastTarget = true; // 点击事件需要
 
-            var marquee = viewportGo.AddComponent<UniKit.UI.UIMarquee>();
+            var marquee = viewportGo.AddComponent<UniKit.UI.Marquee>();
             marquee.Viewport = viewport;
             marquee.ContentTemplate = template;
             marquee.ScrollMode = mode;

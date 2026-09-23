@@ -2,9 +2,9 @@ using UnityEditor;
 using UnityEngine;
 
 namespace ZStudio.UniKit.UI.Editor {
-    [CustomEditor(typeof(UIMarquee))]
+    [CustomEditor(typeof(Marquee))]
     [CanEditMultipleObjects]
-    public class UIMarqueeEditor : UnityEditor.Editor {
+    public class MarqueeEditor : UnityEditor.Editor {
         private SerializedProperty m_Viewport;
         private SerializedProperty m_ContentTemplate;
         private SerializedProperty m_Items;
@@ -143,7 +143,7 @@ namespace ZStudio.UniKit.UI.Editor {
             EditorGUILayout.Space();
             EditorGUILayout.LabelField("Runtime", EditorStyles.boldLabel);
 
-            var marquee = (UIMarquee)target;
+            var marquee = (Marquee)target;
             EditorGUILayout.LabelField($"IsPlaying: {marquee.IsPlaying}    IsPaused: {marquee.IsPaused}    CurrentIndex: {marquee.CurrentIndex}");
 
             using (new EditorGUILayout.HorizontalScope()) {

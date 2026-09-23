@@ -18,7 +18,7 @@ namespace ZStudio.UniKit.UI {
         /// <summary>池为空时创建一个新视图（挂到 parent 下，可处于未激活状态）。</summary>
         RectTransform CreateView(Transform parent);
 
-        /// <summary>把片段内容绑定到视图，并返回该视图应占用的尺寸（像素，宽 × 高）。</summary>
+        /// <summary>把片段内容绑定到视图，并返回该视图应占用的尺寸（UI 本地单位，宽 × 高）；必须覆盖旧内容的显示状态。</summary>
         Vector2 Bind(RectTransform view, MarqueeSegment segment);
 
         /// <summary>视图回收前的清理（如停止 spine 动画、释放引用）。无需清理可空实现。</summary>
@@ -35,10 +35,31 @@ namespace ZStudio.UniKit.UI {
 
         public static IReadOnlyList<IMarqueeSegmentRenderer> Renderers => s_Renderers;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        private static void ResetRegistry() => s_Renderers.Clear();
+
         public static void Register(IMarqueeSegmentRenderer renderer) {
-            if (renderer != null && !s_Renderers.Contains(renderer)) {
-                s_Renderers.Add(renderer);
+            if (renderer == null) {
+                return;
             }
+            
+            if (string.IsNullOrEmpty(renderer.Key) || renderer.Key.StartsWith("builtin.")) {
+                throw new System.ArgumentException("渲染器 Key 不能为空或使用内置前缀 builtin。", nameof(renderer));
+            }
+
+            foreach (var registered in s_Renderers) {
+                if (registered.Key != renderer.Key) {
+                    continue;
+                }
+                
+                if (ReferenceEquals(registered, renderer)) {
+                    return;
+                }
+                
+                throw new System.InvalidOperationException($"跑马灯渲染器 Key 已注册：{renderer.Key}");
+            }
+
+            s_Renderers.Add(renderer);
         }
 
         public static void Unregister(IMarqueeSegmentRenderer renderer) {

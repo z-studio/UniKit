@@ -15,7 +15,7 @@
 
 - 将本包置于工程 `Packages/` 目录下，或
 - 通过 Package Manager 以本地路径 / Git URL 引入，或
-- 直接拷贝 `Assets/UIMarquee` 到工程。
+- 将包中的 Runtime 与 Editor 目录一并复制到工程 Assets 下，并保留程序集定义。
 
 ## 快速开始
 
@@ -33,11 +33,11 @@
 | 模式 | 说明 |
 | --- | --- |
 | `Sequential`（逐条轮播） | 按列表顺序逐条展示。内容未超过视口且 `centerWhenFit` 开启时居中停留 `displayDurationWhenFit` 秒；超过视口时贴边停留 `displayDurationBeforeScroll` 秒后匀速滚出，再播放下一条。受 `playMode`（Loop/Once）与每条目的 `cycles` 控制。 |
-| `Continuous`（无缝连续滚动） | 条目首尾相接匀速流动形成无缝跑马灯。忽略 `playMode`、`cycles`（除 `0` 表示禁用该条）、停留时长，仅使用 `scrollSpeed`、`spacing`、`direction`。采用**环形复用**：只创建“铺满视口 + 1 个待命”的单元，滚出流出边的单元绕回入场端并换下一条数据，**常驻对象数 ≈ 铺满视口所需，与条目总数无关**（20 条也可能只需几个）。单元经对象池复用，`Refresh()` / 重新 `Play()` 不销毁重建。 |
+| `Continuous`（无缝连续滚动） | 条目首尾相接匀速流动形成无缝跑马灯。忽略 `playMode`、`cycles`（除 `0` 表示禁用该条）、停留时长，仅使用 `scrollSpeed`、`spacing`、`direction`。采用**环形复用**：只创建“铺满视口 + 1 个待命”的单元，滚出流出边的单元绕回入场端并换下一条数据，**常驻对象数 ≈ 铺满视口所需，与条目总数无关**（20 条也可能只需几个）。单元经对象池复用，`Refresh()` / 重新 `Play()` 复用现有对象。 |
 
 ## 方向
 
-`direction` 支持 `Left` / `Right` / `Up` / `Down`，对两种模式均生效。运行时修改方向/间距后调用 `Refresh()` 即时生效；`scrollSpeed` 对 Continuous 模式每帧读取，无需 `Refresh`。
+`direction` 支持 `Left` / `Right` / `Up` / `Down`，对两种模式均生效。运行时修改方向/间距会在下一帧自动更新；`scrollSpeed` 对 Continuous 模式每帧读取，无需 `Refresh`。
 
 ## 缓动（Sequential 专用）
 
@@ -45,7 +45,7 @@
 
 - `Linear`
 - `Sine` / `Quad` / `Cubic` / `Quart` / `Quint` / `Expo` / `Circ` 各 `In` / `Out` / `InOut`
-- `Back` / `Elastic` / `Bounce` 各 `In` / `Out` / `InOut`（带过冲/回弹，中段可能超出 `[0,1]`，位移用 `LerpUnclamped` 支持过冲）
+- `Back` / `Elastic` / `Bounce` 各 `In` / `Out` / `InOut`（Back、Elastic 可超出 `[0,1]`，Bounce 在范围内回弹；位移使用 `LerpUnclamped`）
 - `Custom`：使用 `customCurve`（`AnimationCurve`），横轴 `0→1` 为进度、纵轴 `0→1` 为位移比例，可自定义任意曲线（同样支持超出 `[0,1]` 的过冲）
 
 > **仅 Sequential 模式生效**。Continuous（无缝连续滚动）为保证接缝处无跳变，始终保持匀速，忽略 `ease`。
@@ -68,11 +68,11 @@
 | --- | --- | --- |
 | `MarqueeTextSegment` | 核心 | `text` |
 | `MarqueeImageSegment` | 核心 | `sprite`、`size`（为 0 时用 sprite 原始尺寸） |
-| `SpineSegment` | `UIMarquee.Spine`（可选） | `skeletonDataAsset`、`skinName`、`animationName`、`loop`、`timeScale`、`scale`、`size` |
+| `SpineSegment` | `ZStudio.UniKit.UI.Marquee.Spine`（可选） | `skeletonDataAsset`、`skinName`、`animationName`、`loop`、`timeScale`、`scale`、`size` |
 
 ```csharp
 using UnityEngine;
-using ZStudio.UIMarquee;
+using ZStudio.UniKit.UI;
 
 // 单段（便捷工厂）
 marquee.AddItem(MarqueeItemData.Text("欢迎来到游戏！", "welcome"));
@@ -81,7 +81,7 @@ marquee.AddItem(MarqueeItemData.Image(iconSprite, "icon"));
 // 混排：文本 + 图片 + Spine + 文本
 var item = new MarqueeItemData(
     new MarqueeTextSegment("恭喜 "),
-    new MarqueeImageSegment(avatarSprite) { size = new Vector2(48, 48) },
+    new MarqueeImageSegment(avatarSprite) { Size = new Vector2(48, 48) },
     new SpineSegment {
         skeletonDataAsset = crownAsset,
         animationName = "idle",
@@ -89,7 +89,7 @@ var item = new MarqueeItemData(
         size = new Vector2(64, 64),
     },
     new MarqueeTextSegment(" 荣获冠军！")
-) { id = "honor_1" };
+) { ID = "honor_1" };
 marquee.AddItem(item);
 ```
 
@@ -100,11 +100,11 @@ marquee.AddItem(item);
 
 ## Spine 扩展（可选）
 
-Spine 支持位于独立程序集 `UIMarquee.Spine`（`Assets/UIMarquee/Extensions/Spine`），**核心库不依赖 Spine**：
+Spine 支持位于独立程序集 `ZStudio.UniKit.UI.Marquee.Spine`（`Runtime/Spine`），**核心库不依赖 Spine**：
 
-- **启用条件**：程序集通过 `defineConstraints: ["UIMARQUEE_SPINE"]` 守卫，仅在该宏存在时参与编译。
-  - 通过 **UPM 包**（`com.esotericsoftware.spine.spine-unity`）安装 Spine 时，`versionDefines` 会**自动定义** `UIMARQUEE_SPINE`，开箱即用。
-  - 若 Spine 是以 **`.unitypackage` 导入到 `Assets`**（非 UPM）安装的，请在 *Project Settings → Player → Scripting Define Symbols* 中**手动添加** `UIMARQUEE_SPINE`。
+- **启用条件**：程序集通过 `defineConstraints: ["UI_MARQUEE_SPINE"]` 守卫，仅在该宏存在时参与编译。
+  - 通过 **UPM 包**（`com.esotericsoftware.spine.spine-unity`）安装 Spine 时，`versionDefines` 会**自动定义** `UI_MARQUEE_SPINE`，开箱即用。
+  - 若 Spine 是以 **`.unitypackage` 导入到 `Assets`**（非 UPM）安装的，请在 *Project Settings → Player → Scripting Define Symbols* 中**手动添加** `UI_MARQUEE_SPINE`。
 - **未安装 Spine 的工程**：宏不存在 → 扩展程序集整体不参与编译，**不会产生任何编译错误**，核心库照常零依赖运行。
 - **自动注册**：`SpineSegmentRenderer` 通过 `[RuntimeInitializeOnLoadMethod]` 在游戏启动时自动注册到 `MarqueeSegmentRendererRegistry`，业务侧无需手动接入；漏装扩展却使用了 `SpineSegment` 时，运行时会打印一次找不到渲染器的警告。
 
@@ -127,7 +127,7 @@ public void Play(int startIndex = 0);          // 开始播放（每次重置 cy
 public int  Stop();                            // 停止并返回当前索引
 public void Pause();                           // 暂停（停留与滚动都会冻结）
 public void Unpause();                         // 取消暂停
-public void Refresh();                         // 用当前配置重新开始（方向/间距改动后调用）
+public void Refresh();                         // 请求重新布局，保留播放次数与一次性等待
 public void SetItems(List<MarqueeItemData> items, bool startPlay = true);
 public void AddItem(MarqueeItemData item);     // 追加（不打断当前播放）
 public void AddItems(List<MarqueeItemData> items);
@@ -147,14 +147,14 @@ public int  CurrentIndex { get; }
 ### 示例
 
 ```csharp
-using ZStudio.UIMarquee;
+using ZStudio.UniKit.UI;
 
 var items = new List<MarqueeItemData> {
     MarqueeItemData.Text("欢迎来到游戏！", "welcome"),
     MarqueeItemData.Text("限时活动进行中", "event_001", cycles: 3),
 };
 
-marquee.OnItemClicked += (item, _) => Debug.Log($"点击了公告：{item.id}");
+marquee.OnItemClicked += (item, _) => Debug.Log($"点击了公告：{item.ID}");
 marquee.SetItems(items); // 默认立即开始播放
 ```
 
@@ -164,7 +164,7 @@ marquee.SetItems(items); // 默认立即开始播放
 
 ```csharp
 using System.Threading;
-using ZStudio.UIMarquee;
+using ZStudio.UniKit.UI;
 
 // 依次播完 A、B，再执行后续逻辑——无需监听 onComplete 回调
 async Awaitable ShowIntroAsync(CancellationToken ct) {
@@ -188,7 +188,7 @@ async Awaitable ShowIntroAsync(CancellationToken ct) {
 
 - **两条跑马灯**：顶部一条 `Sequential`（逐条轮播）、底部一条 `Continuous`（无缝连续滚动），均含**文本 + 图片混排**条目。
 - **Sequential 演示项**：缓动 `ease` 循环切换（Linear / QuadInOut / CubicOut / BackOut / ElasticOut / BounceOut）、`Loop` ⇄ `Once` 播放模式切换、`cycles` 限定次数（某条仅出现两次后被跳过）、短内容居中停留、`PlayOnce` 一次性播放（完成后自动恢复循环）。
-- **Continuous 演示项**：`scrollSpeed` 滑条**即时调速**、`spacing` 滑条 + `Apply (Refresh)` 演示「改后需 Refresh 生效」、运行时 `AddItem` 追加并 `Refresh`。
+- **Continuous 演示项**：`scrollSpeed` 滑条**即时调速**、`spacing` 滑条 + `Apply (Refresh)` 可显式请求重新布局（间距也会自动生效）、运行时 `AddItem` 追加并 `Refresh`。
 - **全局控制**：四方向循环、暂停 / 恢复 / 停止 / 重播。
 - **事件**：订阅 `OnItemStart` / `OnItemComplete` / `OnLoopComplete` / `OnAllComplete` / `OnItemClicked` 全事件。
 - **界面**：全部用 **UGUI** 搭建（`Canvas` + `CanvasScaler` 按屏幕缩放，自适应不同分辨率）——左侧控制面板（按钮 / 滑条）提供上述全部运行时控制；事件回调输出到 **Console**。点击任意跑马灯内容可触发 `OnItemClicked`。
@@ -206,11 +206,14 @@ async Awaitable ShowIntroAsync(CancellationToken ct) {
 - **首帧兜底**：`viewport` 宽度尚未完成布局（为 0）时会等待若干帧，避免首条计算错误。
 - **易于测试**：核心几何/索引逻辑抽离到 `MarqueeMath` 纯静态类，不依赖运行时状态，可直接编写 EditMode 单元测试验证。
 
-## 注意事项（按设计取舍）
+## 更新与生命周期
 
-以下为有意为之的行为，并非缺陷，使用时请知悉：
-
-- **运行时改参的生效时机**：`scrollSpeed` 在 Continuous 模式按帧读取、即时生效；而 `direction`、`spacing`，以及 Continuous 模式下通过 `AddItem` / `AddItems` 追加的条目，需要调用 `Refresh()`（或重新 `Play()`）后才会重新构建并生效。
-- **`Refresh()` 会重置 `cycles` 预算**：`Refresh()` 内部等价于用当前配置重新 `Play()`，因此在 Sequential + 限次 `cycles` 播放途中调用它（例如改方向/间距后刷新），会**重置所有条目的 `cycles` 出现次数预算**（等同重新满额播放）。对 `cycles = -1`（无限）无影响。若需在不重置计数的前提下变更参数，请知悉该副作用。
-- **禁用→重新启用的恢复语义**：禁用 GameObject 时若正在持续播放（非 `PlayOnce`），重新启用后会从“当前条”恢复，并**重置 `cycles` 出现次数预算**（等价于对当前条重新满额播放）。对 `cycles = -1`（无限）无影响；一次性的 `PlayOnce` 被禁用打断后不会自动恢复。
-- **点击诊断仅检测一次**：缺少 `GraphicRaycaster` 的诊断警告只在**首次 `Play`** 时检查。请在首次播放前完成 `OnItemClicked` 订阅，否则不会收到该提示（仅影响开发期提示，不影响功能）。
+- `Play()` 表示重新播放，会重置次数预算；`Refresh()` 只请求重新布局，不重置预算、不取消一次性等待。
+- Sequential 的方向、视口尺寸、速度与间距变化会自动反映到后续帧；Continuous 的方向、间距变化及追加条目会触发自动重铺，重铺可能改变当前可见位置。
+- 修改条目对象内部的片段内容后调用 `Refresh()`；直接修改 Inspector 的 `Items` 不会替换运行中的列表，请使用 `SetItems()`。
+- `SetItems()` 停止旧播放并清空旧视图。空列表保持停止；非空列表由 `startPlay` 决定是否启动。
+- 禁用后重新启用会从当前条重新展示，但保留剩余次数；一次性播放被取消，不自动恢复。
+- 取消令牌可以从后台线程触发；停止协程与完成取消等待统一在后续主线程更新中处理。
+- 渲染器 Key 必须唯一，不能使用 `builtin.` 前缀。注册表在每次进入播放模式时清空，扩展应在 `BeforeSceneLoad` 阶段重新注册。
+- 组件销毁时回收自己的视图并恢复模板激活状态，不修改原始 TMP 模板的换行/溢出设置。
+- 尺寸、间距与速度使用 UI 本地单位，受 Canvas 缩放影响，并非屏幕物理像素。

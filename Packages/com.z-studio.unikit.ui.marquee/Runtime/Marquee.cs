@@ -8,7 +8,7 @@ using UnityEngine.UI;
 
 namespace ZStudio.UniKit.UI {
     [RequireComponent(typeof(RectTransform))]
-    public class UIMarquee : MonoBehaviour {
+    public class Marquee : MonoBehaviour {
         [Tooltip("可视区域（建议挂载 Mask 或 RectMask2D 以裁剪）")]
         public RectTransform Viewport;
 
@@ -103,28 +103,34 @@ namespace ZStudio.UniKit.UI {
         private readonly Stack<MarqueeUnit> m_UnitPool = new();   // 空闲待复用单元（Refresh 复用，减少 GC）
         private List<MarqueeItemData> m_Ring;                     // 参与滚动的有效条目
         private readonly List<int> m_RingSource = new();          // m_Ring[i] 对应的原始 m_Items 下标（点击回调用，保证与 Sequential 一致）
-        private float m_RingLength;                               // 一份序列的轴向总长（含 spacing），用于 clamp
+        private float m_RingLength;                               // 一份序列的轴向总长（含 spacing），用于周期取余
         private int m_LastDataIndex;                              // 最近分配给单元的数据下标
 
         private int m_CurrentIndex = -1;
         private List<MarqueeItemData> m_Items;
         private readonly List<int> m_Remaining = new(); // 剩余出现次数副本，避免污染用户数据
-        private Coroutine m_Routine;
+       
+        // 每次播放独立拥有协程、等待与取消状态，旧播放不能结束新播放的等待。
+        private sealed class PlaybackSession {
+            public Coroutine Routine;
+            public AwaitableCompletionSource Completion;
+            public CancellationTokenRegistration Registration;
+            public volatile bool CancellationRequested;
+        }
+
+        private PlaybackSession m_Session;
+        private bool m_TemplateWasActive;
+        private bool m_ContentInitialized;
         private int m_RunId;
         private bool m_IsOneShot;
         private bool m_ResumeOnEnable;
         private int m_ResumeIndex;
+        private bool m_ResumePaused;
         private bool m_RaycasterChecked;
 
         // 本次 Sequential 播放是否强制 Once 语义（忽略 playMode=Loop）；PlaySequenceOnceAsync 使用
         private bool m_ForceOnce;
         
-        // 当前一次性 await（PlayOnceAsync / PlaySequenceOnceAsync）的完成源；null 表示无挂起的等待
-        private AwaitableCompletionSource m_PendingOnce;
-        
-        // 外部取消令牌在 m_PendingOnce 上的注册，随该等待的完成/取消一并释放
-        private CancellationTokenRegistration m_OnceCtReg;
-
         public bool IsPlaying { get; private set; }
         public bool IsPaused { get; private set; }
 
@@ -167,7 +173,7 @@ namespace ZStudio.UniKit.UI {
         private void OnEnable() {
             if (m_ResumeOnEnable) {
                 m_ResumeOnEnable = false;
-                Play(m_ResumeIndex < 0 ? 0 : m_ResumeIndex);
+                ResumePlayback();
             }
         }
 
@@ -177,15 +183,40 @@ namespace ZStudio.UniKit.UI {
             if (IsPlaying && !m_IsOneShot) {
                 m_ResumeOnEnable = true;
                 m_ResumeIndex = m_CurrentIndex;
+                m_ResumePaused = IsPaused;
             }
 
             CancelRun();
-            IsPlaying = false;
-            IsPaused = false;
         }
 
         private void OnDestroy() {
             CancelRun();
+            ClearUnit(m_SeqUnit);
+            ClearUnit(m_MeasureUnit);
+            ReleaseAllActiveUnits();
+            
+            if (m_SeqUnit?.root != null) {
+                Destroy(m_SeqUnit.root.gameObject);
+            }
+            
+            if (m_Track != null) {
+                Destroy(m_Track.gameObject);
+            }
+            
+            if (m_PoolParent != null) {
+                Destroy(m_PoolParent.gameObject);
+            }
+            
+            if (m_ContentInitialized && ContentTemplate != null) {
+                ContentTemplate.gameObject.SetActive(m_TemplateWasActive);
+            }
+        }
+
+        private void Update() {
+            // CancellationToken 可以从任意线程取消，只在 Unity 主线程操作协程和视图。
+            if (m_Session != null && m_Session.CancellationRequested) {
+                Stop();
+            }
         }
 
         private void SetupContent() {
@@ -198,8 +229,6 @@ namespace ZStudio.UniKit.UI {
             var txt = ContentTemplate.GetComponentInChildren<TextMeshProUGUI>(true);
 
             if (txt != null) {
-                txt.textWrappingMode = TextWrappingModes.NoWrap;
-                txt.overflowMode = TextOverflowModes.Overflow;
                 m_TextTemplate = txt.rectTransform;
             }
 
@@ -212,6 +241,8 @@ namespace ZStudio.UniKit.UI {
             }
 
             // contentTemplate 仅作模板来源，运行时不直接显示
+            m_TemplateWasActive = ContentTemplate.gameObject.activeSelf;
+            m_ContentInitialized = true;
             ContentTemplate.gameObject.SetActive(false);
 
             EnsurePoolParent();
@@ -257,25 +288,25 @@ namespace ZStudio.UniKit.UI {
 
             WarnIfNoRaycaster();
             int runId = BeginRun();
+            
+            if (runId != m_RunId) {
+                return;
+            }
+            
             m_IsOneShot = false;
             m_ForceOnce = false;
 
-            if (ScrollMode == MarqueeScrollMode.Continuous) {
-                m_Routine = StartCoroutine(RunContinuous(runId));
-            } else {
-                ResetRemaining();
-                m_CurrentIndex = Mathf.Clamp(startIndex, 0, m_Items.Count - 1) - 1;
-                m_Routine = StartCoroutine(RunSequential(runId));
-            }
+            ResetRemaining();
+            m_CurrentIndex = Mathf.Clamp(startIndex, 0, m_Items.Count - 1) - 1;
+            StartPlayback(RunConfigured(runId), runId);
         }
 
         /// <summary>停止播放并返回当前索引。</summary>
         public int Stop() {
-            CancelRun();
-            IsPlaying = false;
-            IsPaused = false;
+            int index = m_CurrentIndex;
             m_ResumeOnEnable = false;
-            return m_CurrentIndex;
+            CancelRun();
+            return index;
         }
 
         /// <summary>暂停播放（停留与滚动都会冻结）。</summary>
@@ -296,17 +327,47 @@ namespace ZStudio.UniKit.UI {
             IsPaused = false;
         }
 
-        /// <summary>使用当前配置重新开始播放（运行时修改 direction/spacing 后调用以即时生效）。</summary>
+        /// <summary>请求重建布局，保留剩余次数；一次性播放在后续布局更新中应用配置。</summary>
         public void Refresh() {
-            if (!IsPlaying) {
+            m_LayoutDirty = true;
+        }
+
+        private bool m_LayoutDirty;
+
+        private void ResumePlayback() {
+            int runId = BeginRun();
+            
+            if (runId != m_RunId) {
                 return;
             }
-
-            Play(ScrollMode == MarqueeScrollMode.Continuous ? 0 : Mathf.Max(0, m_CurrentIndex));
+            
+            IsPaused = m_ResumePaused;
+            m_IsOneShot = false;
+            m_ForceOnce = false;
+            int index = Mathf.Max(0, m_ResumeIndex);
+            
+            if (ScrollMode == MarqueeScrollMode.Sequential && index < m_Remaining.Count
+                && m_Items[index]?.Cycles > 0) {
+                m_Remaining[index]++;
+            }
+            m_CurrentIndex = index - 1;
+            StartPlayback(RunConfigured(runId), runId);
         }
 
         /// <summary>设置条目并可选是否立即开始播放。</summary>
         public void SetItems(List<MarqueeItemData> newItems, bool startPlay = true) {
+            int expectedId = m_RunId + 1;
+            Stop();
+            
+            if (m_RunId != expectedId) {
+                return; // 取消回调中的新请求优先。
+            }
+            
+            ClearUnit(m_SeqUnit);
+            m_SeqUnit?.root.gameObject.SetActive(false);
+            ReleaseAllActiveUnits();
+            m_Ring = null;
+            m_CurrentIndex = -1;
             SetItemsInternal(newItems != null ? new List<MarqueeItemData>(newItems) : new List<MarqueeItemData>());
 
             if (startPlay && m_Items.Count > 0) {
@@ -321,6 +382,7 @@ namespace ZStudio.UniKit.UI {
             if (newItem != null) {
                 m_Items.Add(newItem);
                 m_Remaining.Add(newItem.Cycles);
+                m_LayoutDirty = true;
             }
         }
 
@@ -332,11 +394,12 @@ namespace ZStudio.UniKit.UI {
                 foreach (MarqueeItemData item in newItems) {
                     m_Items.Add(item);
                     m_Remaining.Add(item?.Cycles ?? 0);
+                    m_LayoutDirty = true;
                 }
             }
         }
 
-        /// <summary>播放单条文字（一次性），完成或被打断时回调 onComplete。</summary>
+        /// <summary>播放单条文字（一次性），正常完成时回调 onComplete（被打断不回调）。</summary>
         public void PlayOnce(string text, Action onComplete = null) {
             PlayOnce(MarqueeItemData.Text(text), onComplete);
         }
@@ -349,12 +412,17 @@ namespace ZStudio.UniKit.UI {
 
             WarnIfNoRaycaster();
             int runId = BeginRun();
+            
+            if (runId != m_RunId) {
+                return;
+            }
+            
             m_IsOneShot = true;
             m_ForceOnce = false;
 
             DestroyTrack();
             m_SeqUnit.root.gameObject.SetActive(true);
-            m_Routine = StartCoroutine(RunOnce(runId, item, onComplete));
+            StartPlayback(RunOnce(runId, item, onComplete), runId);
         }
 
         /// <summary>播放单条文字（一次性）的 async 版本：await 直到播放完成。语义同 <see cref="PlayOnceAsync(MarqueeItemData, CancellationToken)"/>。</summary>
@@ -375,15 +443,21 @@ namespace ZStudio.UniKit.UI {
 
             WarnIfNoRaycaster();
             int runId = BeginRun();
+            
+            if (runId != m_RunId) {
+                return CanceledAwaitable();
+            }
+            
             m_IsOneShot = true;
             m_ForceOnce = false;
             var acs = new AwaitableCompletionSource();
+            Awaitable result = acs.Awaitable;
             RegisterPendingOnce(acs, cancellationToken); // 须在 BeginRun 之后：BeginRun 已取消上一个挂起的 await
 
             DestroyTrack();
             m_SeqUnit.root.gameObject.SetActive(true);
-            m_Routine = StartCoroutine(RunOnce(runId, item, null));
-            return acs.Awaitable;
+            StartPlayback(RunOnce(runId, item, null), runId);
+            return result;
         }
 
         /// <summary>
@@ -403,15 +477,21 @@ namespace ZStudio.UniKit.UI {
 
             WarnIfNoRaycaster();
             int runId = BeginRun();
+            
+            if (runId != m_RunId) {
+                return CanceledAwaitable();
+            }
+            
             m_IsOneShot = true;  // 一次性序列，被禁用打断后不自动恢复
             m_ForceOnce = true;  // 强制 Once：即使 playMode 为 Loop 也会自然结束
             var acs = new AwaitableCompletionSource();
+            Awaitable result = acs.Awaitable;
             RegisterPendingOnce(acs, cancellationToken);
 
             ResetRemaining();
             m_CurrentIndex = Mathf.Clamp(startIndex, 0, m_Items.Count - 1) - 1;
-            m_Routine = StartCoroutine(RunSequential(runId));
-            return acs.Awaitable;
+            StartPlayback(RunSequential(runId), runId);
+            return result;
         }
 
         // 立即完成 / 立即取消的 Awaitable 工厂（先取 Awaitable 引用再置状态，避免持有已完成的池化对象）。
@@ -458,51 +538,154 @@ namespace ZStudio.UniKit.UI {
         }
 
         private int BeginRun() {
+            // 取消旧等待可能同步执行业务 continuation；若其已启动新播放，本次请求让出控制权。
+            int expectedId = m_RunId + 1;
             CancelRun();
+            
+            if (m_RunId != expectedId) {
+                return expectedId;
+            }
+            
+            m_Session = new PlaybackSession();
             IsPlaying = true;
             IsPaused = false;
-            return ++m_RunId;
+            return expectedId;
+        }
+
+        private void StartPlayback(IEnumerator routine, int runId) {
+            PlaybackSession session = m_Session;
+            
+            if (runId != m_RunId || session == null) {
+                return;
+            }
+            
+            if (session.CancellationRequested) {
+                Stop();
+                return;
+            }
+            
+            Coroutine coroutine = StartCoroutine(DrivePlayback(routine, runId));
+            
+            // StartCoroutine 会同步执行到第一个 yield，期间事件可能已经替换了播放。
+            if (m_Session == session && runId == m_RunId) {
+                session.Routine = coroutine;
+            } else if (coroutine != null) {
+                StopCoroutine(coroutine);
+            }
+        }
+
+        // 展开嵌套 IEnumerator，让渲染器/事件异常也能结束所属 await，避免永久悬挂。
+        private IEnumerator DrivePlayback(IEnumerator routine, int runId) {
+            var stack = new Stack<IEnumerator>();
+            stack.Push(routine);
+            
+            try {
+                while (stack.Count > 0 && runId == m_RunId) {
+                    object yielded = null;
+                    bool hasNext = false;
+                    Exception failure = null;
+                    
+                    try {
+                        IEnumerator iterator = stack.Peek();
+                        hasNext = iterator.MoveNext();
+                        
+                        if (hasNext && runId == m_RunId) {
+                            yielded = iterator.Current;
+                        }
+                    } catch (Exception exception) {
+                        failure = exception;
+                    }
+                    
+                    if (failure != null) {
+                        if (runId == m_RunId && m_Session != null) {
+                            PlaybackSession session = m_Session;
+                            m_Session = null;
+                            IsPlaying = false;
+                            IsPaused = false;
+                            session.Registration.Dispose();
+                            
+                            if (session.Completion != null) {
+                                session.Completion.TrySetException(failure);
+                            } else {
+                                Debug.LogException(failure, this);
+                            }
+                        } else {
+                            Debug.LogException(failure, this);
+                        }
+                        
+                        yield break;
+                    }
+                    
+                    if (runId != m_RunId) {
+                        yield break;
+                    }
+                    
+                    if (!hasNext) {
+                        (stack.Pop() as IDisposable)?.Dispose();
+                    } else if (yielded is IEnumerator nested) {
+                        stack.Push(nested);
+                    } else {
+                        yield return yielded;
+                    }
+                }
+            } finally {
+                while (stack.Count > 0) (stack.Pop() as IDisposable)?.Dispose();
+            }
         }
 
         private void CancelRun() {
-            if (m_Routine != null) {
-                StopCoroutine(m_Routine);
-                m_Routine = null;
+            ++m_RunId;
+            PlaybackSession session = m_Session;
+            m_Session = null;
+            IsPlaying = false;
+            IsPaused = false;
+            
+            if (session == null) {
+                return;
             }
-
-            // 中断当前播放：若存在未完成的一次性 await，将其置为已取消（await 处会抛 OperationCanceledException）。
-            // 所有中断路径（BeginRun / Stop / OnDisable / OnDestroy）都经过此处，故 async 版本不会悬挂。
-            CancelPendingOnce();
+            
+            if (session.Routine != null) {
+                StopCoroutine(session.Routine);
+            }
+            
+            session.Registration.Dispose();
+            
+            // 先完成所有内部清理，再允许 await continuation 重入。
+            session.Completion?.TrySetCanceled();
         }
 
-        // 登记一次性 await 的完成源（须在 BeginRun 之后调用，避免被本次的 CancelRun 误取消）。
         private void RegisterPendingOnce(AwaitableCompletionSource acs, CancellationToken cancellationToken) {
-            m_PendingOnce = acs;
-
+            PlaybackSession session = m_Session;
+            session.Completion = acs;
+            
             if (cancellationToken.CanBeCanceled) {
-                m_OnceCtReg = cancellationToken.Register(static state => ((UIMarquee)state).Stop(), this);
+                session.Registration = cancellationToken.Register(
+                    static state => ((PlaybackSession)state).CancellationRequested = true, session);
             }
         }
 
-        // 正常完成：置结果，await 处正常返回。
-        private void CompletePendingOnce() {
-            DisposeOnceRegistration();
-            AwaitableCompletionSource acs = m_PendingOnce;
-            m_PendingOnce = null;
-            acs?.TrySetResult();
-        }
-
-        // 被打断：置取消，await 处抛 OperationCanceledException。
-        private void CancelPendingOnce() {
-            DisposeOnceRegistration();
-            AwaitableCompletionSource acs = m_PendingOnce;
-            m_PendingOnce = null;
-            acs?.TrySetCanceled();
-        }
-
-        private void DisposeOnceRegistration() {
-            m_OnceCtReg.Dispose();
-            m_OnceCtReg = default;
+        private void FinishRun(int runId, Action onComplete = null) {
+            if (runId != m_RunId || m_Session == null) {
+                return;
+            }
+            
+            PlaybackSession session = m_Session;
+            m_Session = null;
+            IsPlaying = false;
+            IsPaused = false;
+            session.Registration.Dispose();
+            
+            if (session.CancellationRequested) {
+                session.Completion?.TrySetCanceled();
+                return;
+            }
+            
+            try {
+                onComplete?.Invoke();
+            } finally {
+                // 即使回调启动了新播放或抛出异常，也只结束本次等待。
+                session.Completion?.TrySetResult();
+            }
         }
 
         private float DeltaTime() {
@@ -550,6 +733,13 @@ namespace ZStudio.UniKit.UI {
         // Sequential 逐条轮播
         // ----------------------------------------------------------------
 
+        private IEnumerator RunConfigured(int runId) {
+            while (runId == m_RunId && m_Session != null) {
+                yield return ScrollMode == MarqueeScrollMode.Continuous
+                    ? RunContinuous(runId) : RunSequential(runId);
+            }
+        }
+
         private IEnumerator RunSequential(int runId) {
             DestroyTrack();
 
@@ -557,7 +747,6 @@ namespace ZStudio.UniKit.UI {
                 m_SeqUnit.root.gameObject.SetActive(true);
             }
 
-            bool loop = !m_ForceOnce && PlayMode == MarqueePlayMode.Loop;
             bool naturalEnd = false;
 
             while (runId == m_RunId) {
@@ -566,6 +755,11 @@ namespace ZStudio.UniKit.UI {
                     continue;
                 }
 
+                if (!m_IsOneShot && ScrollMode != MarqueeScrollMode.Sequential) {
+                    yield break;
+                }
+                
+                bool loop = !m_ForceOnce && PlayMode == MarqueePlayMode.Loop;
                 int next = MarqueeMath.GetNextPlayableIndex(m_Remaining, m_CurrentIndex, loop, out bool loopCompleted);
 
                 if (next < 0) {
@@ -575,6 +769,10 @@ namespace ZStudio.UniKit.UI {
 
                 if (loopCompleted) {
                     OnLoopComplete?.Invoke();
+                    
+                    if (runId != m_RunId) {
+                        yield break;
+                    }
                 }
 
                 m_CurrentIndex = next;
@@ -593,20 +791,24 @@ namespace ZStudio.UniKit.UI {
                 }
 
                 OnItemStart?.Invoke(item, next);
-                yield return MoveSequentialItem(size);
-                OnItemComplete?.Invoke(item, next);
-            }
-
-            if (runId == m_RunId) {
-                IsPlaying = false;
-                IsPaused = false;
-
-                if (naturalEnd) {
-                    OnAllComplete?.Invoke();
+                
+                if (runId != m_RunId) {
+                    yield break;
                 }
-
-                CompletePendingOnce(); // PlaySequenceOnceAsync 的 await 在序列自然结束时返回
+                
+                yield return MoveSequentialItem(size);
+                
+                if (runId != m_RunId || (!m_IsOneShot && ScrollMode != MarqueeScrollMode.Sequential)) {
+                    yield break;
+                }
+                
+                OnItemComplete?.Invoke(item, next);
+                
+                // 零停留、零尺寸等极端配置也不能在同一帧无限遍历循环列表。
+                yield return null;
             }
+
+            FinishRun(runId, naturalEnd ? () => OnAllComplete?.Invoke() : null);
         }
 
         private IEnumerator RunOnce(int runId, MarqueeItemData item, Action onComplete) {
@@ -616,52 +818,55 @@ namespace ZStudio.UniKit.UI {
                 yield return MoveSequentialItem(size);
             }
 
-            if (runId == m_RunId) {
-                IsPlaying = false;
-                IsPaused = false;
-                onComplete?.Invoke();
-                CompletePendingOnce(); // PlayOnceAsync 的 await 在此正常返回
-            }
+            FinishRun(runId, onComplete);
         }
 
         private IEnumerator MoveSequentialItem(Vector2 contentSize) {
             yield return EnsureViewportReady();
+            float holdElapsed = 0f;
+            float progress = 0f;
+            float segmentSpacing = SegmentSpacing;
+            m_LayoutDirty = false;
 
-            Vector2 viewportSize = Viewport.rect.size;
-            bool overflow = MarqueeMath.IsOverflow(Direction, viewportSize, contentSize);
-
-            AlignCenter(m_SeqUnit.root);
-            m_SeqUnit.root.sizeDelta = contentSize;
-
-            if (!overflow && CenterWhenFit) {
-                m_SeqUnit.root.anchoredPosition = Vector2.zero;
-                yield return WaitSeconds(DisplayDurationWhenFit);
-                yield break;
-            }
-
-            MarqueeMath.ComputeScrollPositions(Direction, viewportSize, contentSize, EdgeMargin, out Vector2 start, out Vector2 end);
-            m_SeqUnit.root.anchoredPosition = start;
-
-            yield return WaitSeconds(DisplayDurationBeforeScroll);
-
-            float distance = Vector2.Distance(start, end);
-            float duration = distance / Mathf.Max(1f, ScrollSpeed);
-            float elapsed = 0f;
-
-            while (elapsed < duration) {
-                if (!IsPaused) {
-                    elapsed += DeltaTime();
-                    float t = Mathf.Clamp01(elapsed / duration);
-                    float eased = Ease == MarqueeEase.Custom && CustomCurve != null
-                        ? CustomCurve.Evaluate(t)
-                        : MarqueeMath.Evaluate(Ease, t);
-                    m_SeqUnit.root.anchoredPosition = Vector2.LerpUnclamped(start, end, eased);
+            while (true) {
+                if (!m_IsOneShot && ScrollMode != MarqueeScrollMode.Sequential) {
+                    yield break;
                 }
-
+                
+                if (m_LayoutDirty || segmentSpacing != SegmentSpacing) {
+                    m_LayoutDirty = false;
+                    contentSize = ApplySegments(m_SeqUnit, m_SeqUnit.item, m_SeqUnit.sourceIndex);
+                    segmentSpacing = SegmentSpacing;
+                }
+                
+                Vector2 viewportSize = Viewport.rect.size;
+                bool fit = CenterWhenFit && !MarqueeMath.IsOverflow(Direction, viewportSize, contentSize);
+                MarqueeMath.ComputeScrollPositions(Direction, viewportSize, contentSize, EdgeMargin,
+                    out Vector2 start, out Vector2 end);
+                float holdDuration = fit ? DisplayDurationWhenFit : DisplayDurationBeforeScroll;
+                float duration = Vector2.Distance(start, end) / Mathf.Max(1f, ScrollSpeed);
+                
+                if (!IsPaused) {
+                    if (holdElapsed < Mathf.Max(0f, holdDuration)) {
+                        holdElapsed += DeltaTime();
+                    } else if (fit) {
+                        yield break;
+                    } else {
+                        progress = duration > 0f ? Mathf.Min(1f, progress + DeltaTime() / duration) : 1f;
+                    }
+                }
+                
+                float eased = Ease == MarqueeEase.Custom && CustomCurve != null
+                    ? CustomCurve.Evaluate(progress) : MarqueeMath.Evaluate(Ease, progress);
+                m_SeqUnit.root.anchoredPosition = fit ? Vector2.zero : Vector2.LerpUnclamped(start, end, eased);
+               
+                if (!fit && progress >= 1f) {
+                    m_SeqUnit.root.anchoredPosition = end;
+                    yield break;
+                }
+                
                 yield return null;
             }
-
-            m_SeqUnit.root.anchoredPosition = end;
         }
 
         // ----------------------------------------------------------------
@@ -683,23 +888,43 @@ namespace ZStudio.UniKit.UI {
             yield return EnsureViewportReady();
 
             if (!BuildRing()) {
-                if (runId == m_RunId) {
-                    IsPlaying = false;
-                    IsPaused = false;
-                    OnAllComplete?.Invoke(); // 无可播放条目：与 Sequential naturalEnd 及文档语义保持一致
-                }
-
+                FinishRun(runId, () => OnAllComplete?.Invoke());
                 yield break;
             }
 
             EnsureTrackContainer();
             LayoutRing(MarqueeMath.AxisSize(Direction, Viewport.rect.size));
 
+            MarqueeDirection layoutDirection = Direction;
+            float layoutSpacing = Spacing;
+            float layoutSegmentSpacing = SegmentSpacing;
+            m_LayoutDirty = false;
+            
             while (runId == m_RunId) {
+                if (ScrollMode != MarqueeScrollMode.Continuous) {
+                    yield break;
+                }
+                
+                if (m_LayoutDirty || layoutDirection != Direction || layoutSpacing != Spacing
+                    || layoutSegmentSpacing != SegmentSpacing) {
+                    m_LayoutDirty = false;
+                    
+                    if (!BuildRing()) {
+                        FinishRun(runId, () => OnAllComplete?.Invoke());
+                        yield break;
+                    }
+                    
+                    LayoutRing(MarqueeMath.AxisSize(Direction, Viewport.rect.size));
+                    layoutDirection = Direction;
+                    layoutSpacing = Spacing;
+                    layoutSegmentSpacing = SegmentSpacing;
+                }
+                
                 if (!IsPaused) {
                     float viewportAxis = MarqueeMath.AxisSize(Direction, Viewport.rect.size);
-                    // 单帧位移上限为一份序列长，避免极端卡顿帧的过量绕回迭代
-                    float move = Mathf.Min(DeltaTime() * Mathf.Max(1f, ScrollSpeed), m_RingLength);
+                    
+                    // 完整周期后的画面相同；取余保留卡顿帧的实际相位，不截断为一圈导致减速。
+                    float move = Mathf.Repeat(DeltaTime() * Mathf.Max(1f, ScrollSpeed), m_RingLength);
                     AdvanceRing(move, viewportAxis);
                 }
 
@@ -768,9 +993,7 @@ namespace ZStudio.UniKit.UI {
 
         /// <summary>回收所有已完全滚出流出边的队首单元（入池复用）。</summary>
         private void RecycleExitedUnits(float viewportAxis) {
-            int guard = 0;
-
-            while (m_ActiveUnits.Count > 0 && guard++ <= m_ActiveUnits.Count) {
+            while (m_ActiveUnits.Count > 0) {
                 MarqueeUnit head = m_ActiveUnits[0];
 
                 if (!MarqueeMath.ContinuousUnitFullyExited(Direction, head.center, head.axisSize, viewportAxis)) {
@@ -883,7 +1106,40 @@ namespace ZStudio.UniKit.UI {
         }
 
         private Vector2 MeasureItem(MarqueeItemData item) {
-            return ApplySegments(m_MeasureUnit, item, 0);
+            if (item?.Segments == null) {
+                return Vector2.zero;
+            }
+            
+            float width = 0f;
+            float height = 0f;
+            int count = 0;
+            
+            foreach (MarqueeSegment segment in item.Segments) {
+                if (segment == null) {
+                    continue;
+                }
+                
+                Vector2 size;
+                
+                if (segment is MarqueeTextSegment text && m_TextTemplate != null) {
+                    var tmp = m_TextTemplate.GetComponent<TextMeshProUGUI>();
+                    size = tmp.GetPreferredValues(text.Text ?? string.Empty, Mathf.Infinity, Mathf.Infinity);
+                } else if (segment is MarqueeImageSegment image && m_ImageTemplate != null) {
+                    size = image.Size;
+                    if ((size.x <= 0f || size.y <= 0f) && image.Sprite != null) size = image.Sprite.rect.size;
+                } else {
+                    // 扩展内容允许依赖实际视图测量，统一使用隐藏单元，不提前激活动画。
+                    return ApplySegments(m_MeasureUnit, item, 0);
+                }
+                
+                if (count++ > 0) {
+                    width += SegmentSpacing;
+                }
+                
+                width += Mathf.Max(0f, size.x);
+                height = Mathf.Max(height, size.y);
+            }
+            return new Vector2(width, height);
         }
 
         // ----------------------------------------------------------------
@@ -960,10 +1216,13 @@ namespace ZStudio.UniKit.UI {
                 float w = unit.views[i].size.x;
                 unit.views[i].view.anchoredPosition = new Vector2(cursor + w * 0.5f, 0f);
                 cursor += w + SegmentSpacing;
+                unit.views[i].view.gameObject.SetActive(true);
             }
 
             var size = new Vector2(totalW, maxH);
             unit.size = size;
+            unit.item = item;
+            unit.sourceIndex = index;
             unit.root.sizeDelta = size;
             unit.relay.Bind(this, item, index);
             return size;
@@ -980,6 +1239,8 @@ namespace ZStudio.UniKit.UI {
             }
 
             unit.views.Clear();
+            unit.item = null;
+            unit.relay.Bind(null, null, -1);
         }
 
         private IMarqueeSegmentRenderer FindRenderer(MarqueeSegment seg) {
@@ -1003,7 +1264,7 @@ namespace ZStudio.UniKit.UI {
         private RectTransform AcquireSegmentView(IMarqueeSegmentRenderer renderer) {
             Stack<RectTransform> pool = GetPool(renderer.Key);
             RectTransform view = pool.Count > 0 ? pool.Pop() : renderer.CreateView(m_PoolParent);
-            view.gameObject.SetActive(true);
+            view.gameObject.SetActive(false);
             return view;
         }
 
@@ -1029,6 +1290,8 @@ namespace ZStudio.UniKit.UI {
 
         // 显示单元：容器 + 点击中继 + 当前片段视图列表（+ Continuous 几何）
         private sealed class MarqueeUnit {
+            public MarqueeItemData item;
+            public int sourceIndex;
             public RectTransform root;
             public MarqueeClickRelay relay;
             public readonly List<SegView> views = new();
@@ -1074,11 +1337,18 @@ namespace ZStudio.UniKit.UI {
                 }
 
                 string content = seg.Text ?? "";
+                tmp.textWrappingMode = TextWrappingModes.NoWrap;
+                tmp.overflowMode = TextOverflowModes.Overflow;
                 tmp.text = content;
                 return tmp.GetPreferredValues(content);
             }
 
             public void OnRecycle(RectTransform view) {
+                var text = view.GetComponent<TextMeshProUGUI>();
+                
+                if (text != null) {
+                    text.text = string.Empty;
+                }
             }
         }
 
@@ -1121,6 +1391,11 @@ namespace ZStudio.UniKit.UI {
             }
 
             public void OnRecycle(RectTransform view) {
+                var image = view.GetComponent<Image>();
+                
+                if (image != null) {
+                    image.sprite = null;
+                }
             }
         }
 
@@ -1134,18 +1409,6 @@ namespace ZStudio.UniKit.UI {
                    && MarqueeMath.AxisSize(Direction, Viewport.rect.size) <= 0f
                    && frames < maxFrames) {
                 frames++;
-                yield return null;
-            }
-        }
-
-        private IEnumerator WaitSeconds(float seconds) {
-            float t = 0f;
-
-            while (t < seconds) {
-                if (!IsPaused) {
-                    t += DeltaTime();
-                }
-
                 yield return null;
             }
         }

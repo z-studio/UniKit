@@ -33,6 +33,20 @@ namespace ZStudio.UniKit.UI {
             }
 
             gate.Disarm();
+            
+            if (sg == null) {
+                return Vector2.zero;
+            }
+            
+            sg.enabled = seg.skeletonDataAsset != null;
+            view.localScale = Vector3.one;
+            
+            if (seg.skeletonDataAsset == null) {
+                sg.AnimationState?.ClearTracks();
+                sg.skeletonDataAsset = null;
+                sg.Initialize(true);
+                return Vector2.zero;
+            }
 
             if (sg != null && seg.skeletonDataAsset != null) {
                 bool needInit = sg.skeletonDataAsset != seg.skeletonDataAsset || sg.Skeleton == null;
@@ -45,8 +59,13 @@ namespace ZStudio.UniKit.UI {
                     sg.Initialize(true);
                 }
 
-                if (sg.Skeleton != null && !string.IsNullOrEmpty(seg.skinName)) {
-                    sg.Skeleton.SetSkin(seg.skinName);
+                if (sg.Skeleton != null) {
+                    if (string.IsNullOrEmpty(seg.skinName)) {
+                        sg.Skeleton.SetSkin(sg.Skeleton.Data.DefaultSkin);
+                    } else {
+                        sg.Skeleton.SetSkin(seg.skinName);
+                    }
+                    
                     sg.Skeleton.SetSlotsToSetupPose();
                 }
 
@@ -59,7 +78,10 @@ namespace ZStudio.UniKit.UI {
                                      && !string.IsNullOrEmpty(seg.animationName)
                                      && TryResolveViewport(view, out viewport);
 
-                    if (deferPlay) {
+                    if (!view.parent.gameObject.activeInHierarchy) {
+                        // 隐藏测量只保留 setup pose，不提前启动播放。
+                        sg.timeScale = 0f;
+                    } else if (deferPlay) {
                         // 延迟播放：保持 setup pose，等完全进入可视区再 SetAnimation
                         sg.timeScale = seg.timeScale;
                         gate.Arm(sg, viewport, seg.animationName, seg.loop, seg.timeScale);
@@ -118,7 +140,7 @@ namespace ZStudio.UniKit.UI {
 
         private static bool TryResolveViewport(RectTransform view, out RectTransform viewport) {
             viewport = null;
-            var marquee = view.GetComponentInParent<UniKit.UI.UIMarquee>();
+            var marquee = view.GetComponentInParent<Marquee>();
 
             if (marquee == null) {
                 return false;
