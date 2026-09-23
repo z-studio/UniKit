@@ -28,10 +28,10 @@ namespace ZStudio.UniKit.UI {
         [Tooltip("动画播放速度倍率")]
         public float TimeScale = 1f;
 
-        [Tooltip("骨骼整体缩放")]
+        [Tooltip("骨骼整体缩放，同时影响布局占位尺寸")]
         public float Scale = 1f;
 
-        [Tooltip("在跑马灯中占用的显示尺寸（像素，宽 × 高）。x 或 y 为 0 时自动读取骨骼 setup pose 的边界尺寸（同 ImageSegment 的行为）；若骨骼边界也为 0，则该分量保持 0。")]
+        [Tooltip("缩放前的布局尺寸（UI 本地单位，宽 × 高）；最终占位会乘以 Scale 的绝对值。x 或 y 为 0 时自动读取骨骼 setup pose 的边界尺寸（同 ImageSegment 的行为）；若骨骼边界也为 0，则该分量保持 0。")]
         public Vector2 Size = Vector2.zero;
     }
 }

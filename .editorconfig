@@ -5,6 +5,19 @@ root = true
 # Keep opening braces on the same line as the declaration or statement.
 csharp_new_line_before_open_brace = none
 
+# Rider/ReSharper：语句块及类型、方法、属性、局部函数之间保留一行空行。
+# 注释按格式化器的归属规则与代码保持关联，不额外要求注释前后空行。
+resharper_csharp_blank_lines_before_block_statements = 1
+resharper_csharp_blank_lines_after_block_statements = 1
+resharper_csharp_blank_lines_around_type = 1
+resharper_csharp_blank_lines_around_invocable = 1
+resharper_csharp_blank_lines_around_property = 1
+resharper_csharp_blank_lines_around_local_method = 1
+
+# 块位于外层花括号边缘时，不在开括号之后或闭括号之前保留空行。
+resharper_csharp_remove_blank_lines_near_braces_in_code = true
+resharper_csharp_remove_blank_lines_near_braces_in_declarations = true
+
 # Target line width for formatters that support it; not a compiler-enforced limit.
 max_line_length = 120
 

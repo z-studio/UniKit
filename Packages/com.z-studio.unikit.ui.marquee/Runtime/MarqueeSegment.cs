@@ -31,7 +31,7 @@ namespace ZStudio.UniKit.UI {
     public sealed class MarqueeImageSegment : MarqueeSegment {
         public Sprite Sprite;
 
-        [Tooltip("显示尺寸（像素）；x 或 y 为 0 时使用 sprite 原始尺寸")]
+        [Tooltip("布局尺寸（UI 本地单位）；x、y 分别在不大于 0 时使用 Sprite 对应轴的原始尺寸")]
         public Vector2 Size = Vector2.zero;
 
         public MarqueeImageSegment() {

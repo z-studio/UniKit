@@ -7,7 +7,7 @@ namespace ZStudio.UniKit.UI {
         // ----------------------------------------------------------------
         // 内置片段渲染器（文本 / 图片）：克隆 contentTemplate 中的样式模板
         // ----------------------------------------------------------------
-        private sealed class BuiltinImageRenderer : IMarqueeSegmentRenderer {
+        private sealed class BuiltinImageRenderer : IMarqueeSegmentRenderer, IMarqueeSegmentMeasurer {
             private readonly RectTransform m_Template;
 
             public BuiltinImageRenderer(RectTransform template) {
@@ -24,7 +24,7 @@ namespace ZStudio.UniKit.UI {
                 return (RectTransform)go.transform;
             }
 
-            public Vector2 Bind(RectTransform view, MarqueeSegment segment) {
+            public Vector2 Bind(RectTransform view, MarqueeSegment segment, MarqueeRenderContext context) {
                 var seg = (MarqueeImageSegment)segment;
                 var img = view.GetComponent<Image>() ?? view.GetComponentInChildren<Image>(true);
 
@@ -35,11 +35,23 @@ namespace ZStudio.UniKit.UI {
                 img.sprite = seg.Sprite;
                 img.enabled = seg.Sprite != null;
 
+                return Measure(segment);
+            }
+
+            public Vector2 Measure(MarqueeSegment segment) {
+                var seg = (MarqueeImageSegment)segment;
                 Vector2 size = seg.Size;
 
-                if ((size.x <= 0f || size.y <= 0f) && seg.Sprite != null) {
-                    Rect r = seg.Sprite.rect;
-                    size = new Vector2(r.width, r.height);
+                if (seg.Sprite != null) {
+                    Vector2 original = seg.Sprite.rect.size;
+
+                    if (size.x <= 0f) {
+                        size.x = original.x;
+                    }
+
+                    if (size.y <= 0f) {
+                        size.y = original.y;
+                    }
                 }
 
                 return size;

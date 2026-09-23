@@ -25,7 +25,7 @@ namespace ZStudio.UniKit.UI {
                 return (RectTransform)go.transform;
             }
 
-            public Vector2 Bind(RectTransform view, MarqueeSegment segment) {
+            public Vector2 Bind(RectTransform view, MarqueeSegment segment, MarqueeRenderContext context) {
                 var seg = (MarqueeTextSegment)segment;
                 var tmp = view.GetComponent<TextMeshProUGUI>() ?? view.GetComponentInChildren<TextMeshProUGUI>(true);
 
@@ -37,7 +37,7 @@ namespace ZStudio.UniKit.UI {
                 tmp.textWrappingMode = TextWrappingModes.NoWrap;
                 tmp.overflowMode = TextOverflowModes.Overflow;
                 tmp.text = content;
-                return tmp.GetPreferredValues(content);
+                return tmp.GetPreferredValues(content, Mathf.Infinity, Mathf.Infinity);
             }
 
             public void OnRecycle(RectTransform view) {

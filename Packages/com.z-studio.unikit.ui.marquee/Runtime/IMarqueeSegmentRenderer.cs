@@ -5,6 +5,7 @@ namespace ZStudio.UniKit.UI {
     /// <summary>
     /// 片段渲染器：负责把某种 <see cref="MarqueeSegment"/> 渲染成一个 UI 视图（RectTransform），
     /// 并提供创建 / 绑定 / 回收。视图由跑马灯统一做水平排列与对象池管理。
+    /// Bind 统一接收绑定上下文；无视图测量与时间控制按需实现可选接口。
     /// 核心库内置文本/图片渲染器；spine 等外部类型通过
     /// <see cref="MarqueeSegmentRendererRegistry"/> 注册。
     /// </summary>
@@ -15,11 +16,15 @@ namespace ZStudio.UniKit.UI {
         /// <summary>能否渲染该片段。</summary>
         bool CanRender(MarqueeSegment segment);
 
-        /// <summary>池为空时创建一个新视图（挂到 parent 下，可处于未激活状态）。</summary>
+        /// <summary>池为空时创建一个新视图（挂到 parent 下，可处于未激活状态）；创建失败时自行清理尚未返回的资源。</summary>
         RectTransform CreateView(Transform parent);
 
-        /// <summary>把片段内容绑定到视图，并返回该视图应占用的尺寸（UI 本地单位，宽 × 高）；必须覆盖旧内容的显示状态。</summary>
-        Vector2 Bind(RectTransform view, MarqueeSegment segment);
+        /// <summary>
+        /// 绑定片段并返回包含缩放后的最终占位尺寸（UI 本地单位，宽 × 高）。
+        /// 必须覆盖旧内容状态；context.IsMeasuring 为 true 时不得启动动画或业务事件，
+        /// 测量与显示绑定应返回一致的布局尺寸。
+        /// </summary>
+        Vector2 Bind(RectTransform view, MarqueeSegment segment, MarqueeRenderContext context);
 
         /// <summary>视图回收前的清理（如停止 spine 动画、释放引用）。无需清理可空实现。</summary>
         void OnRecycle(RectTransform view);

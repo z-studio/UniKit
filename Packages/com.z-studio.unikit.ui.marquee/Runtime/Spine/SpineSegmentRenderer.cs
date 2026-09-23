@@ -3,43 +3,36 @@ using UnityEngine;
 
 namespace ZStudio.UniKit.UI {
     /// <summary>
-    /// <see cref="SpineSegment"/> 的渲染器：创建并复用 <see cref="SkeletonGraphic"/> 视图。
-    /// 通过 <c>[RuntimeInitializeOnLoadMethod]</c> 在游戏启动时自动注册到
-    /// <see cref="MarqueeSegmentRendererRegistry"/>，业务侧无需手动接入。
+    /// Spine 的布局根节点与绘制子节点分离：根节点表示最终占位，子节点处理骨骼原点与缩放。
+    /// 测量始终使用 setup pose；播放状态和动画首帧不会改变环形布局的周期长度。
     /// </summary>
-    public sealed class SpineSegmentRenderer : IMarqueeSegmentRenderer {
+    public sealed class SpineSegmentRenderer : IMarqueeSegmentRenderer, IMarqueeSegmentTimeControl {
         public string Key => "spine.skeletongraphic";
-
         public bool CanRender(MarqueeSegment segment) => segment is SpineSegment;
 
         public RectTransform CreateView(Transform parent) {
-            var go = new GameObject("SpineSegment", typeof(RectTransform), typeof(CanvasRenderer));
-            var rt = (RectTransform)go.transform;
-            rt.SetParent(parent, false);
-
-            var sg = go.AddComponent<SkeletonGraphic>();
-            sg.raycastTarget = true;
-            go.AddComponent<SpinePlayWhenVisible>();
-            return rt;
+            var root = (RectTransform)new GameObject("SpineSegment", typeof(RectTransform)).transform;
+            root.SetParent(parent, false);
+            
+            var child = new GameObject("SkeletonGraphic", typeof(RectTransform), typeof(CanvasRenderer));
+            child.transform.SetParent(root, false);
+            
+            var graphic = child.AddComponent<SkeletonGraphic>();
+            graphic.raycastTarget = true;
+            
+            // 门控挂在布局根上，检测包含 Scale 的最终占位矩形。
+            root.gameObject.AddComponent<SpinePlayWhenVisible>();
+            return root;
         }
 
-        public Vector2 Bind(RectTransform view, MarqueeSegment segment) {
+        public Vector2 Bind(RectTransform view, MarqueeSegment segment, MarqueeRenderContext context) {
             var seg = (SpineSegment)segment;
-            var sg = view.GetComponent<SkeletonGraphic>();
+            var sg = view.GetComponentInChildren<SkeletonGraphic>(true);
             var gate = view.GetComponent<SpinePlayWhenVisible>();
-
-            if (gate == null) {
-                gate = view.gameObject.AddComponent<SpinePlayWhenVisible>();
-            }
-
             gate.Disarm();
-            
-            if (sg == null) {
-                return Vector2.zero;
-            }
-            
-            sg.enabled = seg.SkeletonDataAsset != null;
             view.localScale = Vector3.one;
+            sg.UnscaledTime = context.IgnoreTimeScale;
+            sg.enabled = seg.SkeletonDataAsset != null;
             
             if (seg.SkeletonDataAsset == null) {
                 sg.AnimationState?.ClearTracks();
@@ -48,112 +41,94 @@ namespace ZStudio.UniKit.UI {
                 return Vector2.zero;
             }
 
-            if (sg != null && seg.SkeletonDataAsset != null) {
-                bool needInit = sg.skeletonDataAsset != seg.SkeletonDataAsset || sg.Skeleton == null;
-
-                if (sg.skeletonDataAsset != seg.SkeletonDataAsset) {
-                    sg.skeletonDataAsset = seg.SkeletonDataAsset;
-                }
-
-                if (needInit) {
-                    sg.Initialize(true);
-                }
-
-                if (sg.Skeleton != null) {
-                    if (string.IsNullOrEmpty(seg.SkinName)) {
-                        sg.Skeleton.SetSkin(sg.Skeleton.Data.DefaultSkin);
-                    } else {
-                        sg.Skeleton.SetSkin(seg.SkinName);
-                    }
-                    
-                    sg.Skeleton.SetSlotsToSetupPose();
-                }
-
-                if (sg.AnimationState != null) {
-                    sg.AnimationState.ClearTracks();
-                    sg.Skeleton?.SetToSetupPose();
-
-                    RectTransform viewport = null;
-                    
-                    bool deferPlay = seg.PlayWhenFullyVisible
-                                     && !string.IsNullOrEmpty(seg.AnimationName)
-                                     && TryResolveViewport(view, out viewport);
-
-                    if (!view.parent.gameObject.activeInHierarchy) {
-                        // 隐藏测量只保留 setup pose，不提前启动播放。
-                        sg.timeScale = 0f;
-                    } else if (deferPlay) {
-                        // 延迟播放：保持 setup pose，等完全进入可视区再 SetAnimation
-                        sg.timeScale = seg.TimeScale;
-                        gate.Arm(sg, viewport, seg.AnimationName, seg.Loop, seg.TimeScale);
-                    } else if (!string.IsNullOrEmpty(seg.AnimationName)) {
-                        sg.AnimationState.SetAnimation(0, seg.AnimationName, seg.Loop);
-                        sg.timeScale = seg.TimeScale;
-                    } else {
-                        sg.timeScale = seg.TimeScale;
-                    }
-                }
-
-                view.localScale = new Vector3(seg.Scale, seg.Scale, 1f);
+            if (sg.skeletonDataAsset != seg.SkeletonDataAsset || sg.Skeleton == null) {
+                sg.skeletonDataAsset = seg.SkeletonDataAsset;
+                sg.Initialize(true);
             }
 
-            // size == 0 时自动读取骨骼包围盒尺寸（同 ImageSegment 用原始尺寸的行为）。
-            // 注意：SkeletonGraphic 的尺寸依赖 mesh 已生成，而跑马灯构建的当帧 mesh 尚未更新，
-            // 直接读 ILayoutElement.preferredWidth/Height 会得到 0（需手动点 Inspector 的 “Match” 才生效）。
-            // 这里主动调用 MatchRectTransformWithBounds()——它内部会强制 Update(0) + UpdateMesh() 再按
-            // mesh 包围盒设置 sizeDelta（等价于 “Match RectTransform with Mesh”），从而在运行时即时生效。
+            if (sg.Skeleton == null || sg.AnimationState == null) {
+                return Vector2.zero;
+            }
+
+            sg.AnimationState.ClearTracks();
+            
+            sg.Skeleton.SetSkin(string.IsNullOrEmpty(seg.SkinName)
+                ? sg.Skeleton.Data.DefaultSkin : sg.Skeleton.Data.FindSkin(seg.SkinName)
+                                                 ?? throw new System.ArgumentException($"Spine 皮肤不存在：{seg.SkinName}"));
+            sg.Skeleton.SetToSetupPose();
+            sg.timeScale = 0f;
+
+            RectTransform child = sg.rectTransform;
+            child.anchorMin = child.anchorMax = child.pivot = new Vector2(0.5f, 0.5f);
+            child.localScale = Vector3.one;
+            child.anchoredPosition = Vector2.zero;
+            
+            // 强制更新 setup pose，避免复用视图沿用上一动画的 mesh 或 bounds。
+            sg.Update(0f);
+            var boundsSize = Vector2.zero;
+            var boundsCenter = Vector2.zero;
+            
+            if (sg.MatchRectTransformWithBounds()) {
+                boundsSize = child.sizeDelta;
+                // Spine 根据 mesh 中心设置 pivot，可反推出骨骼原点到包围盒中心的偏移。
+                boundsCenter = Vector2.Scale(new Vector2(0.5f, 0.5f) - child.pivot, boundsSize);
+            }
+
             Vector2 size = seg.Size;
+            
+            if (size.x <= 0f) {
+                size.x = Mathf.Abs(boundsSize.x);
+            }
+            
+            if (size.y <= 0f) {
+                size.y = Mathf.Abs(boundsSize.y);
+            }
+            
+            child.pivot = new Vector2(0.5f, 0.5f);
+            child.sizeDelta = size;
+            child.localScale = new Vector3(seg.Scale, seg.Scale, 1f);
+            child.anchoredPosition = -boundsCenter * seg.Scale;
 
-            if ((size.x <= 0f || size.y <= 0f) && sg != null && sg.Skeleton != null) {
-                // MatchRectTransformWithBounds 会改动 pivot（按骨骼原点偏移），
-                // 跑马灯需要 pivot 居中来做统一水平排列，故取到尺寸后复原 pivot。
-                Vector2 prevPivot = sg.rectTransform.pivot;
-
-                if (sg.MatchRectTransformWithBounds()) {
-                    Vector2 matched = sg.rectTransform.sizeDelta;
-
-                    if (size.x <= 0f) {
-                        size.x = Mathf.Abs(matched.x);
-                    }
-
-                    if (size.y <= 0f) {
-                        size.y = Mathf.Abs(matched.y);
-                    }
-                }
-
-                sg.rectTransform.pivot = prevPivot;
+            // 在绑定阶段验证，避免延迟门控在每帧 LateUpdate 中重复抛出同一异常。
+            if (!string.IsNullOrEmpty(seg.AnimationName) && sg.Skeleton.Data.FindAnimation(seg.AnimationName) == null) {
+                throw new System.ArgumentException($"Spine 动画不存在：{seg.AnimationName}");
             }
 
-            return size;
+            if (!context.IsMeasuring) {
+                sg.timeScale = seg.TimeScale;
+                
+                if (!string.IsNullOrEmpty(seg.AnimationName)) {
+                    if (seg.PlayWhenFullyVisible && context.Viewport != null) {
+                        gate.Arm(sg, context.Viewport, seg.AnimationName, seg.Loop, seg.TimeScale);
+                    } else {
+                        sg.AnimationState.SetAnimation(0, seg.AnimationName, seg.Loop);
+                    }
+                }
+            }
+
+            return size * Mathf.Abs(seg.Scale);
+        }
+
+        public void SetTimeMode(RectTransform view, bool ignoreTimeScale) {
+            var sg = view.GetComponentInChildren<SkeletonGraphic>(true);
+            
+            if (sg != null) {
+                sg.UnscaledTime = ignoreTimeScale;
+            }
         }
 
         public void OnRecycle(RectTransform view) {
-            var gate = view.GetComponent<SpinePlayWhenVisible>();
-            gate?.Disarm();
-
-            var sg = view.GetComponent<SkeletonGraphic>();
-
-            if (sg != null && sg.AnimationState != null) {
-                sg.AnimationState.ClearTracks();
+            view.GetComponent<SpinePlayWhenVisible>()?.Disarm();
+            var sg = view.GetComponentInChildren<SkeletonGraphic>(true);
+            
+            if (sg != null) {
+                sg.AnimationState?.ClearTracks();
                 sg.Skeleton?.SetToSetupPose();
+                sg.timeScale = 0f;
             }
-        }
-
-        private static bool TryResolveViewport(RectTransform view, out RectTransform viewport) {
-            viewport = null;
-            var marquee = view.GetComponentInParent<Marquee>();
-
-            if (marquee == null) {
-                return false;
-            }
-
-            viewport = marquee.Viewport != null ? marquee.Viewport : marquee.transform as RectTransform;
-            return viewport != null;
         }
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void AutoRegister() {
-            MarqueeSegmentRendererRegistry.Register(new SpineSegmentRenderer());
-        }
+        private static void AutoRegister() => MarqueeSegmentRendererRegistry.Register(new SpineSegmentRenderer());
     }
 }

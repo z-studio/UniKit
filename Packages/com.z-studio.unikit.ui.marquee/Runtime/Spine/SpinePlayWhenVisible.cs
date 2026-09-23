@@ -33,6 +33,9 @@ namespace ZStudio.UniKit.UI {
         public void Disarm() {
             m_Armed = false;
             enabled = false;
+            m_Skeleton = null;
+            m_Viewport = null;
+            m_AnimationName = null;
         }
 
         private void LateUpdate() {
