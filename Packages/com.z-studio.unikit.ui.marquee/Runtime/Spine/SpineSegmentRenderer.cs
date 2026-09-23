@@ -38,21 +38,21 @@ namespace ZStudio.UniKit.UI {
                 return Vector2.zero;
             }
             
-            sg.enabled = seg.skeletonDataAsset != null;
+            sg.enabled = seg.SkeletonDataAsset != null;
             view.localScale = Vector3.one;
             
-            if (seg.skeletonDataAsset == null) {
+            if (seg.SkeletonDataAsset == null) {
                 sg.AnimationState?.ClearTracks();
                 sg.skeletonDataAsset = null;
                 sg.Initialize(true);
                 return Vector2.zero;
             }
 
-            if (sg != null && seg.skeletonDataAsset != null) {
-                bool needInit = sg.skeletonDataAsset != seg.skeletonDataAsset || sg.Skeleton == null;
+            if (sg != null && seg.SkeletonDataAsset != null) {
+                bool needInit = sg.skeletonDataAsset != seg.SkeletonDataAsset || sg.Skeleton == null;
 
-                if (sg.skeletonDataAsset != seg.skeletonDataAsset) {
-                    sg.skeletonDataAsset = seg.skeletonDataAsset;
+                if (sg.skeletonDataAsset != seg.SkeletonDataAsset) {
+                    sg.skeletonDataAsset = seg.SkeletonDataAsset;
                 }
 
                 if (needInit) {
@@ -60,10 +60,10 @@ namespace ZStudio.UniKit.UI {
                 }
 
                 if (sg.Skeleton != null) {
-                    if (string.IsNullOrEmpty(seg.skinName)) {
+                    if (string.IsNullOrEmpty(seg.SkinName)) {
                         sg.Skeleton.SetSkin(sg.Skeleton.Data.DefaultSkin);
                     } else {
-                        sg.Skeleton.SetSkin(seg.skinName);
+                        sg.Skeleton.SetSkin(seg.SkinName);
                     }
                     
                     sg.Skeleton.SetSlotsToSetupPose();
@@ -74,8 +74,9 @@ namespace ZStudio.UniKit.UI {
                     sg.Skeleton?.SetToSetupPose();
 
                     RectTransform viewport = null;
-                    bool deferPlay = seg.playWhenFullyVisible
-                                     && !string.IsNullOrEmpty(seg.animationName)
+                    
+                    bool deferPlay = seg.PlayWhenFullyVisible
+                                     && !string.IsNullOrEmpty(seg.AnimationName)
                                      && TryResolveViewport(view, out viewport);
 
                     if (!view.parent.gameObject.activeInHierarchy) {
@@ -83,17 +84,17 @@ namespace ZStudio.UniKit.UI {
                         sg.timeScale = 0f;
                     } else if (deferPlay) {
                         // 延迟播放：保持 setup pose，等完全进入可视区再 SetAnimation
-                        sg.timeScale = seg.timeScale;
-                        gate.Arm(sg, viewport, seg.animationName, seg.loop, seg.timeScale);
-                    } else if (!string.IsNullOrEmpty(seg.animationName)) {
-                        sg.AnimationState.SetAnimation(0, seg.animationName, seg.loop);
-                        sg.timeScale = seg.timeScale;
+                        sg.timeScale = seg.TimeScale;
+                        gate.Arm(sg, viewport, seg.AnimationName, seg.Loop, seg.TimeScale);
+                    } else if (!string.IsNullOrEmpty(seg.AnimationName)) {
+                        sg.AnimationState.SetAnimation(0, seg.AnimationName, seg.Loop);
+                        sg.timeScale = seg.TimeScale;
                     } else {
-                        sg.timeScale = seg.timeScale;
+                        sg.timeScale = seg.TimeScale;
                     }
                 }
 
-                view.localScale = new Vector3(seg.scale, seg.scale, 1f);
+                view.localScale = new Vector3(seg.Scale, seg.Scale, 1f);
             }
 
             // size == 0 时自动读取骨骼包围盒尺寸（同 ImageSegment 用原始尺寸的行为）。
@@ -101,7 +102,7 @@ namespace ZStudio.UniKit.UI {
             // 直接读 ILayoutElement.preferredWidth/Height 会得到 0（需手动点 Inspector 的 “Match” 才生效）。
             // 这里主动调用 MatchRectTransformWithBounds()——它内部会强制 Update(0) + UpdateMesh() 再按
             // mesh 包围盒设置 sizeDelta（等价于 “Match RectTransform with Mesh”），从而在运行时即时生效。
-            Vector2 size = seg.size;
+            Vector2 size = seg.Size;
 
             if ((size.x <= 0f || size.y <= 0f) && sg != null && sg.Skeleton != null) {
                 // MatchRectTransformWithBounds 会改动 pivot（按骨骼原点偏移），

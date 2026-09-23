@@ -17,13 +17,8 @@ namespace ZStudio.UniKit.UI {
         private float m_TimeScale;
         private bool m_Armed;
 
-        public void Arm(
-            SkeletonGraphic skeleton,
-            RectTransform viewport,
-            string animationName,
-            bool loop,
-            float timeScale
-        ) {
+        public void Arm(SkeletonGraphic skeleton, RectTransform viewport, string animationName, bool loop,
+            float timeScale) {
             m_Skeleton = skeleton;
             m_Viewport = viewport;
             m_AnimationName = animationName;
@@ -74,7 +69,7 @@ namespace ZStudio.UniKit.UI {
             float minY = float.MaxValue;
             float maxY = float.MinValue;
 
-            for (int i = 0; i < 4; i++) {
+            for (var i = 0; i < 4; i++) {
                 Vector3 local = outer.InverseTransformPoint(s_Corners[i]);
                 minX = Mathf.Min(minX, local.x);
                 maxX = Mathf.Max(maxX, local.x);
@@ -83,10 +78,10 @@ namespace ZStudio.UniKit.UI {
             }
 
             Rect r = outer.rect;
-            const float e = 0.01f;
+            const float k_E = 0.01f;
 
-            bool xOk = AxisSatisfied(minX, maxX, r.xMin, r.xMax, e);
-            bool yOk = AxisSatisfied(minY, maxY, r.yMin, r.yMax, e);
+            bool xOk = AxisSatisfied(minX, maxX, r.xMin, r.xMax, k_E);
+            bool yOk = AxisSatisfied(minY, maxY, r.yMin, r.yMax, k_E);
             return xOk && yOk;
         }
 
