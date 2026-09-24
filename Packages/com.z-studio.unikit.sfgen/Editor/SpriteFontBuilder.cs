@@ -5,7 +5,6 @@ using System.Linq;
 using System.Reflection;
 using TMPro;
 using UnityEditor;
-using UnityEditor.U2D.Sprites;
 using UnityEngine;
 using UnityEngine.TextCore;
 using UnityEngine.TextCore.LowLevel;
@@ -66,48 +65,18 @@ namespace ZStudio.UniKit.Editor {
             return result;
         }
 
-        internal static SpriteRect[] GetSprites(SpriteFontSettings settings) {
-            if (settings.Atlas == null) {
-                throw new InvalidOperationException("请选择已在 Sprite Editor 中切片的图集。");
-            }
-
-            var importer = AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(settings.Atlas)) as TextureImporter;
-
-            if (importer == null || importer.textureType != TextureImporterType.Sprite ||
-                importer.spriteImportMode != SpriteImportMode.Multiple) {
-                throw new InvalidOperationException("图集需要设置 Texture Type = Sprite (2D and UI)、Sprite Mode = Multiple，并在 Sprite Editor 中切片、Apply。");
-            }
-
-            var factory = new SpriteDataProviderFactories();
-            factory.Init();
-            var provider = factory.GetSpriteEditorDataProviderFromObject(settings.Atlas);
-
-            if (provider == null) {
-                throw new InvalidOperationException("无法读取该图集的 Sprite 切片数据。");
-            }
-
-            provider.InitSpriteEditorDataProvider();
-            var sprites = provider.GetSpriteRects();
-            switch (settings.Order) {
-                case SpriteFontOrder.Name:
-                    Array.Sort(sprites, (a, b) => EditorUtility.NaturalCompare(a.name, b.name));
-                    break;
-                case SpriteFontOrder.Position:
-                    // 按顶边从上到下，同一顶边从左到右；不猜测不规则排列的行归属。
-                    sprites = sprites.OrderByDescending(s => s.rect.yMax).ThenBy(s => s.rect.xMin).ToArray();
-                    break;
-            }
-
-            return sprites;
+        internal static List<Entry> BuildEntries(SpriteFontSettings settings) {
+            using var source = SpriteFontSource.Load(settings);
+            return BuildEntries(settings, source);
         }
 
-        internal static List<Entry> BuildEntries(SpriteFontSettings settings) {
+        internal static List<Entry> BuildEntries(SpriteFontSettings settings, SpriteFontSource source) {
             if (settings.FontSize < 1 || settings.FontSize > 512 || settings.SpaceWidth < 0 ||
                 settings.Baseline < 0 || settings.Baseline > settings.FontSize || settings.LineSpacing < 0) {
                 throw new InvalidOperationException("字号需要在 1–512 之间；基线在 0–字号之间；空格宽度和额外行距不能为负。");
             }
 
-            var allSprites = GetSprites(settings);
+            var allSprites = source.Sprites;
             var byId = allSprites.ToDictionary(sprite => sprite.spriteID.ToString());
             var mapped = new Dictionary<string, uint>();
             var usedCharacters = new HashSet<uint>();
@@ -143,11 +112,10 @@ namespace ZStudio.UniKit.Editor {
             }
 
             var characters = sprites.Select(sprite => mapped[sprite.spriteID.ToString()]).ToArray();
-            var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(settings.Atlas));
-            // 未填写字符的切片不参与字号计算。
-            importer.GetSourceTextureWidthAndHeight(out var sourceWidth, out var sourceHeight);
-            var scaleX = (float)settings.Atlas.width / sourceWidth;
-            var scaleY = (float)settings.Atlas.height / sourceHeight;
+          
+            // 源图模式保留原图坐标；合成图集的坐标已是像素坐标。
+            var scaleX = (float)source.Texture.width / source.Width;
+            var scaleY = (float)source.Texture.height / source.Height;
             var maxHeight = sprites.Max(s => s.rect.height);
             var entries = new List<Entry>(sprites.Length + 1);
 
@@ -163,7 +131,7 @@ namespace ZStudio.UniKit.Editor {
                     Mathf.RoundToInt(rect.yMax * scaleY) - y);
 
                 if (pixels.width <= 0 || pixels.height <= 0 || x < 0 || y < 0 ||
-                    pixels.xMax > settings.Atlas.width || pixels.yMax > settings.Atlas.height) {
+                    pixels.xMax > source.Texture.width || pixels.yMax > source.Texture.height) {
                     throw new InvalidOperationException($"切片「{sprites[i].name}」超出图集或缩放后尺寸为零，请检查切片与导入尺寸。");
                 }
 
@@ -187,7 +155,8 @@ namespace ZStudio.UniKit.Editor {
         }
 
         internal static void Generate(SpriteFontSettings settings) {
-            var entries = BuildEntries(settings);
+            using var source = SpriteFontSource.Load(settings);
+            var entries = BuildEntries(settings, source);
             var settingsPath = AssetDatabase.GetAssetPath(settings);
 
             if (!settingsPath.StartsWith("Assets/", StringComparison.Ordinal)) {
@@ -210,6 +179,13 @@ namespace ZStudio.UniKit.Editor {
             var stem = settingsPath.Substring(0, settingsPath.LastIndexOf('.'));
             var legacyPath = stem + " Text.fontsettings";
             var tmpPath = stem + " TMP.asset";
+            var generatedAtlas = OwnedOutput(settings.GeneratedAtlas, owner);
+            var atlasPath = generatedAtlas != null ? AssetDatabase.GetAssetPath(generatedAtlas) : stem + " Atlas.png";
+
+            if (source.IsGenerated && generatedAtlas == null &&
+                (File.Exists(atlasPath) || AssetDatabase.LoadMainAssetAtPath(atlasPath) != null)) {
+                throw new InvalidOperationException($"字体图集输出已被其他资源占用：{atlasPath}");
+            }
             var makeLegacy = settings.Output != SpriteFontOutput.TextMeshPro;
             var makeTMP = settings.Output != SpriteFontOutput.LegacyText;
 
@@ -220,6 +196,35 @@ namespace ZStudio.UniKit.Editor {
 
             if (makeTMP) {
                 ValidateOutput(tmpPath, tmp, tmp != null ? tmp.material : null);
+            }
+
+            var texture = source.Texture;
+
+            if (source.IsGenerated) {
+                File.WriteAllBytes(atlasPath, texture.EncodeToPNG());
+                AssetDatabase.ImportAsset(atlasPath, ImportAssetOptions.ForceSynchronousImport);
+               
+                var importer = (TextureImporter)AssetImporter.GetAtPath(atlasPath);
+                importer.textureType = TextureImporterType.Default;
+                importer.npotScale = TextureImporterNPOTScale.None;
+                importer.maxTextureSize = 8192;
+                importer.mipmapEnabled = false;
+                importer.isReadable = false;
+                importer.sRGBTexture = true;
+                importer.alphaSource = TextureImporterAlphaSource.FromInput;
+                importer.wrapMode = TextureWrapMode.Clamp;
+                importer.textureCompression = TextureImporterCompression.Uncompressed;
+                importer.userData = owner;
+                
+                // 只修改本工具生成的图片；更新时保持 PNG 的 GUID 不变。
+                importer.SaveAndReimport();
+                texture = AssetDatabase.LoadAssetAtPath<Texture2D>(atlasPath);
+
+                if (texture.width != source.Texture.width || texture.height != source.Texture.height) {
+                    throw new InvalidOperationException("字体图集被平台导入设置缩放，请移除生成图集的平台尺寸覆盖后重试。");
+                }
+
+                settings.GeneratedAtlas = texture;
             }
 
             // 复制配置后生成新字体，不通过复制过来的引用覆盖原配置的输出。
@@ -234,7 +239,7 @@ namespace ZStudio.UniKit.Editor {
                     SetOwner(legacyPath, owner);
                 }
 
-                WriteLegacy(settings, entries, GetMaterial(settings.LegacyFont, shader, settings.Atlas));
+                WriteLegacy(settings, entries, GetMaterial(settings.LegacyFont, shader, texture));
             }
 
             if (makeTMP) {
@@ -245,7 +250,7 @@ namespace ZStudio.UniKit.Editor {
                     SetOwner(tmpPath, owner);
                 }
 
-                WriteTMP(settings, entries, GetMaterial(settings.TMPFont, shader, settings.Atlas));
+                WriteTMP(settings, entries, GetMaterial(settings.TMPFont, shader, texture));
             }
 
             EditorUtility.SetDirty(settings);
@@ -299,14 +304,15 @@ namespace ZStudio.UniKit.Editor {
 
         private static void WriteLegacy(SpriteFontSettings settings, List<Entry> entries, Material material) {
             var font = settings.LegacyFont;
+            var atlas = material.mainTexture;
             var infos = new CharacterInfo[entries.Count];
 
             for (var i = 0; i < entries.Count; i++) {
                 var entry = entries[i];
-                var uv = new Rect((float)entry.Pixels.x / settings.Atlas.width,
-                    (float)entry.Pixels.y / settings.Atlas.height,
-                    (float)entry.Pixels.width / settings.Atlas.width,
-                    (float)entry.Pixels.height / settings.Atlas.height);
+                var uv = new Rect((float)entry.Pixels.x / atlas.width,
+                    (float)entry.Pixels.y / atlas.height,
+                    (float)entry.Pixels.width / atlas.width,
+                    (float)entry.Pixels.height / atlas.height);
                 infos[i] = new CharacterInfo {
                     index = (int)entry.Unicode,
                     size = settings.FontSize,
@@ -344,12 +350,13 @@ namespace ZStudio.UniKit.Editor {
 
         private static void WriteTMP(SpriteFontSettings settings, List<Entry> entries, Material material) {
             var font = settings.TMPFont;
+            var atlas = (Texture2D)material.mainTexture;
             
             // 从切片直接建立静态位图字体，不需要系统字体、FontEngine 或可读纹理副本。
             font.atlasPopulationMode = AtlasPopulationMode.Static;
             font.isMultiAtlasTexturesEnabled = false;
-            font.atlasTextures = new[] { settings.Atlas };
-            s_AtlasTextureCache.SetValue(font, settings.Atlas);
+            font.atlasTextures = new[] { atlas };
+            s_AtlasTextureCache.SetValue(font, atlas);
             font.material = material;
             font.faceInfo = new FaceInfo {
                 familyName = settings.name,
@@ -379,8 +386,8 @@ namespace ZStudio.UniKit.Editor {
             // Apply 会触发 TMP.OnValidate，因此先备齐材质、图集和字形表。
             var serialized = new SerializedObject(font);
             serialized.FindProperty("m_Version").stringValue = "1.1.0";
-            serialized.FindProperty("m_AtlasWidth").intValue = settings.Atlas.width;
-            serialized.FindProperty("m_AtlasHeight").intValue = settings.Atlas.height;
+            serialized.FindProperty("m_AtlasWidth").intValue = atlas.width;
+            serialized.FindProperty("m_AtlasHeight").intValue = atlas.height;
             serialized.FindProperty("m_AtlasPadding").intValue = 0;
             serialized.FindProperty("m_AtlasRenderMode").intValue = (int)GlyphRenderMode.COLOR;
             serialized.ApplyModifiedPropertiesWithoutUndo();

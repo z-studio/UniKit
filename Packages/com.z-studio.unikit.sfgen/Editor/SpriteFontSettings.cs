@@ -3,8 +3,15 @@ using System.Collections.Generic;
 using TMPro;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.U2D;
 
 namespace ZStudio.UniKit.Editor {
+    internal enum SpriteFontSourceType {
+        Texture,
+        Sprites,
+        SpriteAtlas
+    }
+
     internal enum SpriteFontOutput {
         LegacyText,
         TextMeshPro,
@@ -25,7 +32,14 @@ namespace ZStudio.UniKit.Editor {
 
     /// <summary>保存制作参数和输出引用；双击配置即可继续编辑，不参与运行时。</summary>
     internal sealed class SpriteFontSettings : ScriptableObject {
+        public SpriteFontSourceType Source;
         public Texture2D Atlas;
+        public List<Sprite> SourceSprites = new();
+        public SpriteAtlas SourceAtlas;
+
+        [HideInInspector] 
+        public Texture2D GeneratedAtlas;
+
         // 绑定 Sprite 的稳定 ID，列表排序和切片改名都不改变字符映射。
         public List<SpriteFontCharacter> Mappings = new();
         public SpriteFontOrder Order = SpriteFontOrder.Name;
@@ -36,11 +50,11 @@ namespace ZStudio.UniKit.Editor {
         public int LetterSpacing;
         public int LineSpacing;
         public int SpaceWidth = 16;
-        
-        [HideInInspector] 
+
+        [HideInInspector]
         public Font LegacyFont;
-        
-        [HideInInspector] 
+
+        [HideInInspector]
         public TMP_FontAsset TMPFont;
     }
 
@@ -55,7 +69,9 @@ namespace ZStudio.UniKit.Editor {
             }
 
             using (new EditorGUI.DisabledScope(true)) {
-                EditorGUILayout.ObjectField("图集", settings.Atlas, typeof(Texture2D), false);
+                EditorGUILayout.EnumPopup("来源类型", settings.Source);
+                EditorGUILayout.ObjectField("字体纹理", settings.Source == SpriteFontSourceType.Texture
+                    ? settings.Atlas : settings.GeneratedAtlas, typeof(Texture2D), false);
                 EditorGUILayout.ObjectField("Text 字体", settings.LegacyFont, typeof(Font), false);
                 EditorGUILayout.ObjectField("TMP 字体", settings.TMPFont, typeof(TMP_FontAsset), false);
             }

@@ -4,7 +4,6 @@ using System.IO;
 using System.Linq;
 using UnityEditor;
 using UnityEditor.Callbacks;
-using UnityEditor.U2D.Sprites;
 using UnityEngine;
 
 namespace ZStudio.UniKit.Editor {
@@ -24,13 +23,15 @@ namespace ZStudio.UniKit.Editor {
         private string m_Error;
         private string m_Result;
         private SpriteRect[] m_Sprites;
+        private SpriteFontSource m_Source;
+        private bool m_ReloadSource = true;
         private string m_AtlasError;
         private bool m_HasMissingSprites;
         private bool m_ShowLayoutOptions;
         private int m_Page;
         private bool m_NeedsRefresh = true;
 
-        [MenuItem("Tools/UniKit/SFGen", priority = 810)]
+        [MenuItem("Tools/UniKit/Sprite Font Generator", priority = 810)]
         private static void Open() {
             GetWindow<SpriteFontWindow>("Sprite Font");
         }
@@ -57,11 +58,15 @@ namespace ZStudio.UniKit.Editor {
             EditorApplication.projectChanged += RequestRefresh;
             Undo.undoRedoPerformed += RequestRefresh;
             m_NeedsRefresh = true;
+            m_ReloadSource = true;
         }
 
         private void OnDisable() {
             EditorApplication.projectChanged -= RequestRefresh;
             Undo.undoRedoPerformed -= RequestRefresh;
+            m_Source?.Dispose();
+            m_Source = null;
+            m_Entries = null;
         }
 
         private void OnDestroy() {
@@ -89,6 +94,7 @@ namespace ZStudio.UniKit.Editor {
         }
 
         private void RequestRefresh() {
+            m_ReloadSource = true;
             m_NeedsRefresh = true;
             Repaint();
         }
@@ -147,7 +153,8 @@ namespace ZStudio.UniKit.Editor {
 
             if (m_SerializedSettings.ApplyModifiedProperties()) {
                 m_Result = null;
-                RequestRefresh();
+                m_NeedsRefresh = true;
+                Repaint();
             }
         }
 
@@ -181,17 +188,33 @@ namespace ZStudio.UniKit.Editor {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
                 EditorGUILayout.LabelField("1  Sprite 与字符映射", EditorStyles.boldLabel);
                 EditorGUI.BeginChangeCheck();
-                Field("Atlas", "字体图集", "拖入 Texture2D；在 Sprite Editor 中完成 Multiple 切片。");
+                var source = m_SerializedSettings.FindProperty("Source");
+                source.enumValueIndex = EditorGUILayout.Popup("来源类型", source.enumValueIndex,
+                    new[] { "Sprite 纹理（Single、Multiple）", "散图 Sprite", "SpriteAtlas" });
+
+                if ((SpriteFontSourceType)source.enumValueIndex == SpriteFontSourceType.Texture) {
+                    Field("Atlas", "Sprite 纹理", "支持 Single 和 Multiple 模式的 Sprite 纹理。");
+                } else if ((SpriteFontSourceType)source.enumValueIndex == SpriteFontSourceType.SpriteAtlas) {
+                    Field("SourceAtlas", "SpriteAtlas", "读取原始 Sprite 资源，并合成字体专用图集；无需运行或 Pack Preview。");
+                } else {
+                    DrawSpriteSources();
+                }
 
                 if (EditorGUI.EndChangeCheck()) {
-                    // 切换图集时清空映射，不能把另一张图集的字符绑定套用过来。
-                    m_SerializedSettings.FindProperty("Mappings").ClearArray();
+                    // 重新读取来源，但保留仍存在的 Sprite 映射；移除项由失效映射提示处理。
+                    m_ReloadSource = true;
                     m_Page = 0;
                 }
 
+                EditorGUI.BeginChangeCheck();
                 var order = m_SerializedSettings.FindProperty("Order");
-                order.enumValueIndex = EditorGUILayout.Popup("显示顺序", order.enumValueIndex,
-                    new[] { "Sprite Editor 原始顺序", "名称自然排序（2 在 10 前）", "顶边从上到下，同高从左到右" });
+                order.enumValueIndex = EditorGUILayout.Popup("字符列表排序", order.enumValueIndex,
+                    new[] { "来源顺序", "名称自然排序（2 在 10 前）", "按行从上到下，行内从左到右" });
+
+                if (EditorGUI.EndChangeCheck()) {
+                    m_ReloadSource = true;
+                }
+
                 EditorGUILayout.LabelField("在每个 Sprite 旁填写字符，留空跳过。排序不改变对应关系。",
                     EditorStyles.wordWrappedMiniLabel);
 
@@ -201,6 +224,56 @@ namespace ZStudio.UniKit.Editor {
                     EditorGUILayout.HelpBox(m_AtlasError ?? "请选择字体图集。", MessageType.Info);
                 }
             }
+        }
+
+        private void DrawSpriteSources() {
+            var sprites = m_SerializedSettings.FindProperty("SourceSprites");
+            EditorGUILayout.PropertyField(sprites, new GUIContent("Sprite 列表（展开可移除）"), true);
+
+            if (GUILayout.Button("添加 Project 中选中的 Sprite / 图片 / 文件夹")) {
+                AddSpriteSources(Selection.objects);
+            }
+
+            var dropArea = GUILayoutUtility.GetRect(0, 40, GUILayout.ExpandWidth(true));
+            GUI.Box(dropArea, "拖入 Sprite、Sprite 图片或文件夹（可多选）", EditorStyles.helpBox);
+            var current = Event.current;
+
+            if (dropArea.Contains(current.mousePosition) &&
+                (current.type == EventType.DragUpdated || current.type == EventType.DragPerform)) {
+                DragAndDrop.visualMode = DragAndDropVisualMode.Copy;
+
+                if (current.type == EventType.DragPerform) {
+                    DragAndDrop.AcceptDrag();
+                    AddSpriteSources(DragAndDrop.objectReferences);
+                }
+
+                current.Use();
+            }
+        }
+
+        private void AddSpriteSources(UnityEngine.Object[] objects) {
+            var added = new List<Sprite>();
+
+            foreach (var item in objects) {
+                SpriteFontSource.CollectSprites(item, added);
+            }
+
+            var sprites = m_SerializedSettings.FindProperty("SourceSprites");
+            var existing = new HashSet<UnityEngine.Object>();
+
+            for (var i = 0; i < sprites.arraySize; i++) {
+                existing.Add(sprites.GetArrayElementAtIndex(i).objectReferenceValue);
+            }
+
+            foreach (var sprite in added) {
+                if (existing.Add(sprite)) {
+                    var index = sprites.arraySize;
+                    sprites.InsertArrayElementAtIndex(index);
+                    sprites.GetArrayElementAtIndex(index).objectReferenceValue = sprite;
+                }
+            }
+
+            m_ReloadSource = true;
         }
 
         private void DrawLayout() {
@@ -233,21 +306,33 @@ namespace ZStudio.UniKit.Editor {
             m_Entries = null;
             m_Error = null;
 
-            m_Sprites = null;
-            m_AtlasError = null;
             m_HasMissingSprites = false;
 
-            try {
-                m_Sprites = SpriteFontBuilder.GetSprites(m_Settings);
-                var ids = new HashSet<string>(m_Sprites.Select(sprite => sprite.spriteID.ToString()));
-                m_HasMissingSprites = m_Settings.Mappings.Any(mapping => !ids.Contains(mapping.SpriteId));
-            } catch (Exception exception) {
-                m_AtlasError = m_Error = exception.Message;
+            if (m_ReloadSource) {
+                m_ReloadSource = false;
+                m_Source?.Dispose();
+                m_Source = null;
+                m_Sprites = null;
+                m_AtlasError = null;
+
+                try {
+                    m_Source = SpriteFontSource.Load(m_Settings);
+                    m_Sprites = m_Source.Sprites;
+                } catch (Exception exception) {
+                    m_AtlasError = exception.Message;
+                }
+            }
+
+            if (m_Source == null) {
+                m_Error = m_AtlasError;
                 return;
             }
 
+            var ids = new HashSet<string>(m_Sprites.Select(sprite => sprite.spriteID.ToString()));
+            m_HasMissingSprites = m_Settings.Mappings.Any(mapping => !ids.Contains(mapping.SpriteId));
+
             try {
-                m_Entries = SpriteFontBuilder.BuildEntries(m_Settings);
+                m_Entries = SpriteFontBuilder.BuildEntries(m_Settings, m_Source);
             } catch (Exception exception) {
                 m_Error = exception.Message;
             }
@@ -260,9 +345,9 @@ namespace ZStudio.UniKit.Editor {
                 if (m_Entries == null) {
                     EditorGUILayout.HelpBox(m_Error ?? "请先填写字符映射。", MessageType.Info);
 
-                    if (m_Settings.Atlas != null) {
+                    if (m_Source?.Texture != null) {
                         var preview = GUILayoutUtility.GetRect(100, 180);
-                        EditorGUI.DrawTextureTransparent(preview, m_Settings.Atlas, ScaleMode.ScaleToFit);
+                        EditorGUI.DrawTextureTransparent(preview, m_Source.Texture, ScaleMode.ScaleToFit);
                     }
 
                     return;
@@ -274,7 +359,7 @@ namespace ZStudio.UniKit.Editor {
                 DrawTextPreview();
                 EditorGUILayout.Space(12);
                 EditorGUILayout.LabelField("图集", EditorStyles.miniBoldLabel);
-                var atlas = m_Settings.Atlas;
+                var atlas = m_Source.Texture;
                 var availableWidth = m_PreviewWidth;
                 var scale = Mathf.Min(availableWidth / atlas.width, 220f / atlas.height);
                 var frame = GUILayoutUtility.GetRect(availableWidth, atlas.height * scale);
@@ -320,7 +405,7 @@ namespace ZStudio.UniKit.Editor {
                 var rect = glyph.Rect;
                 rect.position += Vector2.one * k_Padding;
                 var pixels = glyph.Entry.Pixels;
-                var atlas = m_Settings.Atlas;
+                var atlas = m_Source.Texture;
                 GUI.DrawTextureWithTexCoords(rect, atlas,
                     new Rect((float)pixels.x / atlas.width, (float)pixels.y / atlas.height,
                         (float)pixels.width / atlas.width, (float)pixels.height / atlas.height));
@@ -403,8 +488,8 @@ namespace ZStudio.UniKit.Editor {
             var mappings = m_SerializedSettings.FindProperty("Mappings");
             var pageCount = Mathf.Max(1, Mathf.CeilToInt((float)m_Sprites.Length / k_PageSize));
             m_Page = Mathf.Clamp(m_Page, 0, pageCount - 1);
-            var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(m_Settings.Atlas));
-            importer.GetSourceTextureWidthAndHeight(out var sourceWidth, out var sourceHeight);
+            var sourceWidth = m_Source.Width;
+            var sourceHeight = m_Source.Height;
 
             using (new EditorGUILayout.HorizontalScope()) {
                 EditorGUILayout.LabelField("Sprite", EditorStyles.miniBoldLabel);
@@ -429,7 +514,7 @@ namespace ZStudio.UniKit.Editor {
 
                     if (rect.width > 0 && rect.height > 0) {
                         var size = rect.size * Mathf.Min(36 / rect.width, 36 / rect.height);
-                        GUI.DrawTextureWithTexCoords(new Rect(preview.center - size * 0.5f, size), m_Settings.Atlas,
+                        GUI.DrawTextureWithTexCoords(new Rect(preview.center - size * 0.5f, size), m_Source.Texture,
                             new Rect(rect.x / sourceWidth, rect.y / sourceHeight,
                                 rect.width / sourceWidth, rect.height / sourceHeight));
                     }
@@ -534,11 +619,11 @@ namespace ZStudio.UniKit.Editor {
         private void Generate() {
             try {
                 // 再次读取切片，不能依赖绘制时的缓存来生成文件。
-                SpriteFontBuilder.BuildEntries(m_Settings);
+                SpriteFontBuilder.BuildEntries(m_Settings, m_Source);
 
                 if (!EditorUtility.IsPersistent(m_Settings)) {
                     var path = EditorUtility.SaveFilePanelInProject("保存 Sprite Font 制作配置",
-                        m_Settings.Atlas.name + " Font", "asset", "双击此配置可以继续编辑和更新字体。");
+                        (m_Settings.Source == SpriteFontSourceType.Texture ? m_Settings.Atlas.name : "Sprite") + " Font", "asset", "双击此配置可以继续编辑和更新字体。");
 
                     if (string.IsNullOrEmpty(path)) {
                         return;
