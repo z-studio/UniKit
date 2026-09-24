@@ -208,7 +208,11 @@ namespace ZStudio.UniKit.Editor {
                     var identity = AssetDatabase.AssetPathToGUID(path) + ":" + spriteId;
                     var id = new GUID(BitConverter.ToString(hash.ComputeHash(Encoding.UTF8.GetBytes(identity)))
                         .Replace("-", ""));
-                    rects.Add(new SpriteRect { name = sprite.name, spriteID = id });
+                    rects.Add(new SpriteRect {
+                        name = sprite.name, spriteID = id, alignment = rect.alignment, pivot = rect.pivot,
+                        border = Vector4.Scale(rect.border, new Vector4(width / rect.rect.width,
+                            height / rect.rect.height, width / rect.rect.width, height / rect.rect.height))
+                    });
                 }
 
                 Texture = new Texture2D(2, 2, TextureFormat.RGBA32, false) {

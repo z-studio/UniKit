@@ -1,297 +1,254 @@
-using System.Collections.Generic;
+using System;
 using System.IO;
 using System.Linq;
 using TMPro;
 using UnityEditor;
+using UnityEditor.U2D;
 using UnityEditor.U2D.Sprites;
 using UnityEngine;
+using UnityEngine.TextCore;
 using UnityEngine.U2D;
+using Object = UnityEngine.Object;
 
 namespace ZStudio.UniKit.Editor {
-    /// <summary>
-    /// 注意：Unity2022.3.x某个版本后出现了bug，SpriteAtlas的GetSprites接口只有在项目运行中才能获取到正确的textureRect值，非工具bug。
-    /// </summary>
+    /// <summary>编辑模式下导出 Sprite 资源；从原始图片读取，不依赖 SpriteAtlas 的运行时打包结果。</summary>
     public static class SpriteAtlasTools {
-        [MenuItem("Tools/UniKit/Sprite Atlas Tools/SpriteAtlas -> TMP_SpriteAsset (运行时使用)", priority = 800)]
-        private static void SpriteAtlas2TmpSpriteMenu() {
-            var objs = Selection.objects;
+        private const string k_MenuRoot = "Tools/UniKit/Sprite Atlas Tools/";
 
-            foreach (var o in objs) {
-                if (o is SpriteAtlas atlas) {
-                    SpriteAtlas2TMPSpriteAsset(atlas);
-                }
-            }
-        }
+        [MenuItem(k_MenuRoot + "SpriteAtlas 导出 TMP Sprite Asset", priority = 800)]
+        private static void SpriteAtlas2TmpSpriteMenu() => ExportSelection(true, true);
 
-        private static void SpriteAtlas2TMPSpriteAsset(SpriteAtlas atlas) {
-            var atlasPath = AssetDatabase.GetAssetPath(atlas);
-            var directoryName = Path.GetDirectoryName(atlasPath);
-            var fileName = Path.GetFileNameWithoutExtension(atlasPath);
-            var tmpSpriteAssetPath = GetCombinePath(directoryName, $"{fileName}.asset");
-            var textureOutputPath = GetCombinePath(directoryName, $"{fileName}.png");
+        [MenuItem(k_MenuRoot + "SpriteAtlas 导出 Sprite 图片", priority = 801)]
+        private static void SpriteAtlas2SpriteSheet() => ExportSelection(true, false);
 
-            if (!SpriteAtlas2Texture(atlas, textureOutputPath)) {
+        [MenuItem(k_MenuRoot + "Sprite 图片拆分为散图", priority = 802)]
+        private static void SpriteSheet2Sprites() => ExportSelection(false, false);
+
+        [MenuItem(k_MenuRoot + "SpriteAtlas 导出 TMP Sprite Asset", true)]
+        [MenuItem(k_MenuRoot + "SpriteAtlas 导出 Sprite 图片", true)]
+        private static bool CanExportAtlas() =>
+            !EditorApplication.isPlayingOrWillChangePlaymode &&
+            Selection.objects.Any(asset => asset is SpriteAtlas);
+
+        [MenuItem(k_MenuRoot + "Sprite 图片拆分为散图", true)]
+        private static bool CanSplitSprites() =>
+            !EditorApplication.isPlayingOrWillChangePlaymode &&
+            Selection.objects.Any(asset => asset is Sprite || asset is Texture2D &&
+                AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(asset)) is TextureImporter importer &&
+                importer.textureType == TextureImporterType.Sprite);
+
+        private static void ExportSelection(bool atlasMode, bool makeTMP) {
+            var selected = Selection.objects.Where(asset => atlasMode ? asset is SpriteAtlas :
+                asset is Sprite || asset is Texture2D &&
+                AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(asset)) is TextureImporter importer &&
+                importer.textureType == TextureImporterType.Sprite).ToArray();
+
+            if (EditorApplication.isPlayingOrWillChangePlaymode || selected.Length == 0) {
                 return;
             }
 
-            var sprites = new Sprite[atlas.spriteCount];
-            atlas.GetSprites(sprites);
-            TMP_SpriteAsset spriteAsset;
+            // 允许包内资源作为输入，输出统一由用户选择 Assets 内的位置。
+            var destination = EditorUtility.SaveFolderPanel("选择导出位置（Assets 内）", Application.dataPath, "");
 
-            if (File.Exists(tmpSpriteAssetPath)) {
-                spriteAsset = AssetDatabase.LoadAssetAtPath<TMP_SpriteAsset>(tmpSpriteAssetPath);
-            } else {
-                spriteAsset = ScriptableObject.CreateInstance<TMP_SpriteAsset>();
-                AssetDatabase.CreateAsset(spriteAsset, tmpSpriteAssetPath);
-            }
-
-            spriteAsset.spriteSheet = AssetDatabase.LoadAssetAtPath<Texture2D>(textureOutputPath);
-            spriteAsset.spriteCharacterTable.Clear();
-            spriteAsset.spriteGlyphTable.Clear();
-
-            if (spriteAsset.material == null) {
-                var material = new Material(Shader.Find("TextMeshPro/Sprite")) {
-                    mainTexture = spriteAsset.spriteSheet
-                };
-
-                AssetDatabase.AddObjectToAsset(material, spriteAsset);
-                AssetDatabase.SaveAssetIfDirty(spriteAsset);
-                spriteAsset.material = material;
-            }
-
-            var spNameTrim = "(Clone)".ToCharArray();
-
-            for (var i = 0; i < sprites.Length; i++) {
-                var sp = sprites[i];
-                var spRect = sp.textureRect;
-
-                var glyph = new TMP_SpriteGlyph(
-                    (uint)i,
-                    new UnityEngine.TextCore.GlyphMetrics(
-                        spRect.width,
-                        spRect.height,
-                        0,
-                        spRect.height,
-                        spRect.width
-                    ),
-                    new UnityEngine.TextCore.GlyphRect(spRect),
-                    1,
-                    0
-                );
-
-                spriteAsset.spriteGlyphTable.Add(glyph);
-
-                var spChar = new TMP_SpriteCharacter(0xFFFE, glyph) {
-                    name = sp.name.TrimEnd(spNameTrim)
-                };
-
-                spriteAsset.spriteCharacterTable.Add(spChar);
-            }
-
-            AssetDatabase.SaveAssetIfDirty(spriteAsset);
-        }
-
-        [MenuItem("Tools/UniKit/Sprite Atlas Tools/SpriteAtlas -> SpriteSheet (运行时使用)", priority = 801)]
-        private static void SpriteAtlas2SpriteSheet() {
-            var objs = Selection.objects;
-
-            foreach (var o in objs) {
-                if (o is SpriteAtlas atlas) {
-                    SpriteAtlas2SpriteSheet(atlas);
-                }
-            }
-        }
-
-        private static void SpriteAtlas2SpriteSheet(SpriteAtlas atlas) {
-            var atlasPath = AssetDatabase.GetAssetPath(atlas);
-            var directoryName = Path.GetDirectoryName(atlasPath);
-            var fileName = Path.GetFileNameWithoutExtension(atlasPath);
-            var textureOutputPath = GetCombinePath(directoryName, $"{fileName}_sheet.png");
-
-            if (!SpriteAtlas2Texture(atlas, textureOutputPath, TextureImporterType.Sprite)) {
+            if (string.IsNullOrEmpty(destination)) {
                 return;
             }
 
-            var texImporter = AssetImporter.GetAtPath(textureOutputPath) as TextureImporter;
-            var factory = new SpriteDataProviderFactories();
-            factory.Init();
+            var root = Path.GetFullPath(Application.dataPath).Replace('\\', '/').TrimEnd('/');
+            destination = Path.GetFullPath(destination).Replace('\\', '/').TrimEnd('/');
 
-            var dataProvider = factory.GetSpriteEditorDataProviderFromObject(texImporter);
-            dataProvider.InitSpriteEditorDataProvider();
-            dataProvider.SetSpriteRects(GetSpriteRects(atlas));
-            dataProvider.Apply();
-
-            texImporter.SaveAndReimport();
-        }
-
-        /// <summary>
-        /// 导出Multiple类型的Sprite为碎图
-        /// </summary>
-        [MenuItem("Tools/UniKit/Sprite Atlas Tools/SpriteSheet -> sprites", priority = 802)]
-        private static void SpriteSheet2Sprites() {
-            var selectAssetsCount = Selection.objects.Length;
-            EditorUtility.DisplayProgressBar($"拆分图集(0/{selectAssetsCount})", "Export sprite sheet to sprites...", 0);
-
-            var slicedSpritesAssets = new List<string>();
-
-            for (var i = 0; i < selectAssetsCount; i++) {
-                var selectObj = Selection.objects[i];
-
-                if (selectObj == null) {
-                    continue;
-                }
-
-                var objType = selectObj.GetType();
-
-                if (objType != typeof(Sprite) && objType != typeof(Texture2D)) {
-                    Debug.LogError($"导出碎图sprites失败! 你选择的资源不是Sprite或Texture2D类型");
-                    continue;
-                }
-
-                var spPath = AssetDatabase.GetAssetPath(selectObj);
-                var spTex = AssetDatabase.LoadAssetAtPath<Texture2D>(spPath);
-
-                if (spTex == null) {
-                    continue;
-                }
-
-                var texImporter = AssetImporter.GetAtPath(spPath) as TextureImporter;
-
-                if (texImporter.textureType != TextureImporterType.Sprite ||
-                    texImporter.spriteImportMode != SpriteImportMode.Multiple) {
-                    Debug.LogError($"导出碎图sprites失败! 你选择的资源不是Sprite类型或SpriteMode不是Multiple类型: {spPath}");
-                    continue;
-                }
-
-                var texReadable = texImporter.isReadable;
-
-                if (!texReadable) {
-                    texImporter.isReadable = true;
-                    texImporter.SaveAndReimport();
-                }
-
-                var outputDir = GetCombinePath(
-                    Path.GetDirectoryName(spPath),
-                    $"{Path.GetFileNameWithoutExtension(spPath)}_sliced"
-                );
-
-                if (!Directory.Exists(outputDir)) {
-                    Directory.CreateDirectory(outputDir);
-                }
-
-                var providerFactories = new SpriteDataProviderFactories();
-                providerFactories.Init();
-
-                var texProvider = providerFactories.GetSpriteEditorDataProviderFromObject(spTex);
-                texProvider.InitSpriteEditorDataProvider();
-
-                var spRects = texProvider.GetSpriteRects();
-                var childrenSpCount = spRects.Length;
-
-                for (var spIndex = 0; spIndex < childrenSpCount; spIndex++) {
-                    var spRect = spRects[spIndex];
-                    var tex = new Texture2D((int)spRect.rect.width, (int)spRect.rect.height);
-                    tex.SetPixels(spTex.GetPixels((int)spRect.rect.x, (int)spRect.rect.y, tex.width, tex.height));
-                    tex.Apply();
-
-                    var fileName = GetCombinePath(outputDir, $"{CleanFileName(spRect.name)}.png");
-
-                    if (File.Exists(fileName)) {
-                        File.Delete(fileName);
-                    }
-
-                    EditorUtility.DisplayProgressBar(
-                        $"拆分图集({i + 1}/{selectAssetsCount})",
-                        $"导出进度({spIndex}/{childrenSpCount}){System.Environment.NewLine}正在导出碎图{spRect}",
-                        (i + 1) / (float)selectAssetsCount
-                    );
-
-                    File.WriteAllBytes(fileName, tex.EncodeToPNG());
-                    slicedSpritesAssets.Add(fileName);
-                }
-
-                texImporter.isReadable = texReadable;
-                texImporter.SaveAndReimport();
+            if (destination != root && !destination.StartsWith(root + "/", StringComparison.Ordinal)) {
+                EditorUtility.DisplayDialog("无法导出", "请选择当前项目 Assets 内的文件夹。", "关闭");
+                return;
             }
 
-            AssetDatabase.Refresh();
-
-            foreach (var item in slicedSpritesAssets) {
-                var texImporter = AssetImporter.GetAtPath(item) as TextureImporter;
-
-                if (texImporter == null) {
-                    continue;
-                }
-
-                texImporter.textureType = TextureImporterType.Sprite;
-                texImporter.spriteImportMode = SpriteImportMode.Single;
-                texImporter.alphaIsTransparency = true;
-                texImporter.alphaSource = TextureImporterAlphaSource.FromInput;
-                texImporter.mipmapEnabled = false;
-                texImporter.SaveAndReimport();
-            }
-
-            EditorUtility.ClearProgressBar();
-        }
-
-        private static bool SpriteAtlas2Texture(
-            SpriteAtlas atlas,
-            string outputPath,
-            TextureImporterType textureType = TextureImporterType.Default
-        ) {
-            if (atlas == null || atlas.spriteCount == 0) {
-                return false;
-            }
-
-            var getPreviewFunc = typeof(UnityEditor.U2D.SpriteAtlasExtensions).GetMethod(
-                "GetPreviewTextures",
-                System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static
-            );
-
-            if (null == getPreviewFunc) {
-                return false;
-            }
-
-            var previews = getPreviewFunc.Invoke(null, new object[] { atlas }) as Texture2D[];
-
-            if (previews is not { Length: 1 }) {
-                Debug.LogError($"SpriteAtlas转换为Texture失败: 图集存在{previews?.Length}个子图集,请修改MaxTextureSize以确保为单图集");
-                return false;
-            }
-
-            // 通过SpriteAtlasExtensions.GetPreviewTextures拿到的都是压缩过的贴图，并且贴图数据是在一片不可读内存上，
-            // 不能直接使用EncodeToPNG解码保存为png文件。所以我们需要通过Graphics接口把贴图复制出来。
-            var atlasTexture = previews[0];
-            var readableAtlasTex = CopyReadableTexture(atlasTexture);
+            destination = "Assets" + destination.Substring(root.Length);
+            var count = 0;
+            Object lastOutput = null;
 
             try {
-                File.WriteAllBytes(outputPath, readableAtlasTex.EncodeToPNG());
-            } catch (System.Exception e) {
-                Debug.LogException(e);
-                return false;
+                foreach (var asset in selected) {
+                    EditorUtility.DisplayProgressBar("导出 Sprite 资源", asset.name, (float)count / selected.Length);
+                    lastOutput = Export(asset, destination, atlasMode, makeTMP);
+                    count++;
+                }
+
+                Selection.activeObject = lastOutput;
+                EditorGUIUtility.PingObject(lastOutput);
+                Debug.Log($"Sprite Atlas Tools：已导出 {count} 个资源到 {destination}。每次导出使用独立目录，不覆盖已有资源。");
+            } catch (Exception exception) {
+                Debug.LogException(exception);
+                EditorUtility.DisplayDialog("导出失败", $"已完成 {count} 个资源。\n{exception.Message}", "关闭");
             } finally {
-                Object.DestroyImmediate(readableAtlasTex);
+                EditorUtility.ClearProgressBar();
+            }
+        }
+
+        // 每个输入单独提交；失败时仅清理本次新建目录，保留已成功导出的其他输入。
+        private static Object Export(Object asset, string destination, bool atlasMode, bool makeTMP) {
+            var settings = ScriptableObject.CreateInstance<SpriteFontSettings>();
+            string folder = null;
+
+            try {
+                settings.Source = atlasMode ? SpriteFontSourceType.SpriteAtlas : SpriteFontSourceType.Texture;
+                settings.SourceAtlas = asset as SpriteAtlas;
+                settings.Atlas = AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GetAssetPath(asset));
+                using var source = SpriteFontSource.Load(settings);
+                var rects = source.Sprites;
+
+                if (asset is Sprite selectedSprite) {
+                    var id = selectedSprite.GetSpriteID();
+                    rects = rects.Where(rect => rect.spriteID == id).ToArray();
+                }
+
+                if (rects.Length == 0) {
+                    throw new InvalidOperationException("没有可导出的 Sprite，请先在 Sprite Editor 中 Apply。");
+                }
+
+                if (makeTMP && rects.Select(rect => TMP_TextUtilities.GetSimpleHashCode(rect.name)).Distinct().Count()
+                    != rects.Length) {
+                    throw new InvalidOperationException("Sprite 名称重复或 TMP 名称哈希冲突，请先为源 Sprite 设置唯一名称。");
+                }
+
+                var shader = makeTMP ? Shader.Find("TextMeshPro/Sprite") : null;
+
+                if (makeTMP && shader == null) {
+                    throw new InvalidOperationException("找不到 TextMeshPro/Sprite Shader，请先导入 TMP Essential Resources。");
+                }
+
+                var folderPath =
+                    AssetDatabase.GenerateUniqueAssetPath(destination + "/" + CleanFileName(asset.name) + " Export");
+                var guid = AssetDatabase.CreateFolder(destination, Path.GetFileName(folderPath));
+                folder = AssetDatabase.GUIDToAssetPath(guid);
+
+                if (string.IsNullOrEmpty(folder)) {
+                    throw new IOException("无法创建导出目录。");
+                }
+
+                if (atlasMode) {
+                    var texture = SaveTexture(source.Texture, folder + "/Atlas.png", !makeTMP);
+
+                    if (makeTMP) {
+                        return CreateTMP(texture, rects, shader, folder + "/Sprites.asset");
+                    }
+
+                    var importer = (TextureImporter)AssetImporter.GetAtPath(AssetDatabase.GetAssetPath(texture));
+                    var factories = new SpriteDataProviderFactories();
+                    factories.Init();
+                    var provider = factories.GetSpriteEditorDataProviderFromObject(importer);
+                    provider.InitSpriteEditorDataProvider();
+                    provider.SetSpriteRects(rects);
+                    var names = provider.GetDataProvider<ISpriteNameFileIdDataProvider>();
+                    names.SetNameFileIdPairs(rects.Select(rect => new SpriteNameFileIdPair(rect.name, rect.spriteID)));
+                    provider.Apply();
+                    importer.SaveAndReimport();
+                    return AssetDatabase.LoadMainAssetAtPath(folder);
+                }
+
+                var readable = CopyReadableTexture(source.Texture);
+
+                try {
+                    foreach (var sprite in rects) {
+                        // Sprite Editor 使用原图坐标，GPU 回读使用导入尺寸，需转换后再裁切。
+                        var x = Mathf.RoundToInt(sprite.rect.xMin * readable.width / source.Width);
+                        var y = Mathf.RoundToInt(sprite.rect.yMin * readable.height / source.Height);
+                        var width = Mathf.RoundToInt(sprite.rect.xMax * readable.width / source.Width) - x;
+                        var height = Mathf.RoundToInt(sprite.rect.yMax * readable.height / source.Height) - y;
+
+                        if (width <= 0 || height <= 0) {
+                            throw new InvalidOperationException($"切片「{sprite.name}」在导入缩放后尺寸为零。");
+                        }
+
+                        var crop = new Texture2D(width, height, TextureFormat.RGBA32, false);
+
+                        try {
+                            crop.SetPixels(readable.GetPixels(x, y, width, height));
+                            crop.Apply();
+                            var path = AssetDatabase.GenerateUniqueAssetPath($"{folder}/{CleanFileName(sprite.name)}.png");
+                            SaveTexture(crop, path, true, false);
+                            
+                            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+                            var textureSettings = new TextureImporterSettings();
+                            importer.ReadTextureSettings(textureSettings);
+                            textureSettings.spriteAlignment = (int)sprite.alignment;
+                            textureSettings.spritePivot = sprite.pivot;
+                            textureSettings.spriteBorder = Vector4.Scale(sprite.border,
+                                new Vector4(width / sprite.rect.width, height / sprite.rect.height,
+                                    width / sprite.rect.width, height / sprite.rect.height));
+                            importer.SetTextureSettings(textureSettings);
+                            importer.SaveAndReimport();
+                        } finally {
+                            Object.DestroyImmediate(crop);
+                        }
+                    }
+                } finally {
+                    Object.DestroyImmediate(readable);
+                }
+
+                return AssetDatabase.LoadMainAssetAtPath(folder);
+            } catch {
+                if (!string.IsNullOrEmpty(folder)) {
+                    AssetDatabase.DeleteAsset(folder);
+                }
+
+                throw;
+            } finally {
+                Object.DestroyImmediate(settings);
+            }
+        }
+
+        private static Texture2D SaveTexture(Texture2D texture, string path, bool sprite, bool multiple = true) {
+            File.WriteAllBytes(path, texture.EncodeToPNG());
+            AssetDatabase.ImportAsset(path, ImportAssetOptions.ForceSynchronousImport);
+            
+            var importer = (TextureImporter)AssetImporter.GetAtPath(path);
+            importer.textureType = sprite ? TextureImporterType.Sprite : TextureImporterType.Default;
+            importer.spriteImportMode = multiple ? SpriteImportMode.Multiple : SpriteImportMode.Single;
+            importer.npotScale = TextureImporterNPOTScale.None;
+            importer.maxTextureSize = 8192;
+            importer.mipmapEnabled = false;
+            importer.isReadable = false;
+            importer.textureCompression = TextureImporterCompression.Uncompressed;
+            importer.alphaSource = TextureImporterAlphaSource.FromInput;
+            importer.wrapMode = TextureWrapMode.Clamp;
+            importer.SaveAndReimport();
+            
+            var output = AssetDatabase.LoadAssetAtPath<Texture2D>(path);
+
+            if (output.width != texture.width || output.height != texture.height) {
+                throw new InvalidOperationException("导出图片被平台设置缩放，请检查 TextureImporter 默认预设。");
             }
 
-            AssetDatabase.Refresh();
-            var texImporter = AssetImporter.GetAtPath(outputPath) as TextureImporter;
+            return output;
+        }
 
-            if (texImporter == null) {
-                Debug.LogError("TextureImporter转换失败");
-                return false;
+        private static TMP_SpriteAsset CreateTMP(Texture2D texture, SpriteRect[] sprites, Shader shader, string path) {
+            var asset = ScriptableObject.CreateInstance<TMP_SpriteAsset>();
+            
+            // 标记为当前字形表格式，避免 TMP 将新资源误判为旧版并尝试升级 spriteInfoList。
+            var serialized = new SerializedObject(asset);
+            serialized.FindProperty("m_Version").stringValue = "1.1.0";
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            asset.name = Path.GetFileNameWithoutExtension(path);
+            asset.spriteSheet = texture;
+            asset.material = new Material(shader) { name = "Sprite Material", mainTexture = texture };
+            AssetDatabase.CreateAsset(asset, path);
+            AssetDatabase.AddObjectToAsset(asset.material, asset);
+
+            for (var i = 0; i < sprites.Length; i++) {
+                var rect = sprites[i].rect;
+                var glyph = new TMP_SpriteGlyph((uint)i,
+                    new GlyphMetrics(rect.width, rect.height, 0, rect.height, rect.width),
+                    new GlyphRect(rect), 1, 0);
+                asset.spriteGlyphTable.Add(glyph);
+                asset.spriteCharacterTable.Add(new TMP_SpriteCharacter(0xFFFE, glyph) { name = sprites[i].name });
             }
 
-            texImporter.textureType = textureType;
-
-            if (textureType == TextureImporterType.Sprite) {
-                texImporter.spriteImportMode = SpriteImportMode.Multiple;
-                texImporter.isReadable = true;
-            }
-
-            texImporter.textureShape = TextureImporterShape.Texture2D;
-            texImporter.alphaIsTransparency = true;
-            texImporter.SaveAndReimport();
-            return true;
+            asset.UpdateLookupTables();
+            EditorUtility.SetDirty(asset.material);
+            EditorUtility.SetDirty(asset);
+            AssetDatabase.SaveAssetIfDirty(asset);
+            return asset;
         }
 
         /// <summary>GPU 回读源纹理，不修改 Read/Write；完整恢复全局渲染状态并释放临时资源。</summary>
@@ -323,50 +280,14 @@ namespace ZStudio.UniKit.Editor {
             }
         }
 
-        private static SpriteRect[] GetSpriteRects(SpriteAtlas atlas) {
-            if (atlas == null || atlas.spriteCount == 0) {
-                return null;
+        private static string CleanFileName(string name) {
+            // 额外处理跨平台非法字符，避免在 macOS 导出后无法在 Windows 使用。
+            foreach (var c in Path.GetInvalidFileNameChars().Concat("<>:\"/\\|?*")) {
+                name = name.Replace(c, '_');
             }
 
-            var sprites = new Sprite[atlas.spriteCount];
-            atlas.GetSprites(sprites);
-
-            var spriteRects = new SpriteRect[sprites.Length];
-            var spNameTrim = "(Clone)".ToCharArray();
-
-            for (var i = 0; i < sprites.Length; i++) {
-                var sp = sprites[i];
-
-                spriteRects[i] = new SpriteRect {
-                    name = sp.name.Trim(spNameTrim),
-                    rect = sp.textureRect
-                };
-            }
-
-            return spriteRects;
-        }
-
-        private static string GetCombinePath(params string[] args) {
-            return Path.Combine(args).Replace('\\', '/');
-        }
-
-        private static string CleanFileName(string fileName) {
-            if (string.IsNullOrEmpty(fileName)) {
-                return "unnamed";
-            }
-
-            // 只替换操作系统禁止的字符
-            char[] invalidChars = Path.GetInvalidFileNameChars();
-            fileName = invalidChars.Aggregate(fileName, (current, c) => current.Replace(c, '_'));
-
-            // 去掉开头的点，防止隐藏文件
-            fileName = fileName.TrimStart('.');
-            
-            if (string.IsNullOrEmpty(fileName)) {
-                fileName = "unnamed";
-            }
-
-            return fileName;
+            name = name.Trim().Trim('.');
+            return string.IsNullOrEmpty(name) ? "Sprite" : name;
         }
     }
 }

@@ -115,3 +115,15 @@ Assets/Fonts/
 - `Editor/SpriteFontSource.cs`：来源读取、稳定标识和临时图集合成。
 - `Editor/SpriteFontBuilder.cs`：字符校验、切片映射、字体度量和资源生成。
 - `Shaders/SpriteFont.shader`：两类 UI 字体共用的彩色位图 Shader。
+
+## Sprite Atlas 编辑器工具
+
+菜单 **Tools → UniKit → Sprite Atlas Tools** 提供三个独立入口，均在非运行模式使用：
+
+- **SpriteAtlas 导出 TMP Sprite Asset**：生成 PNG、TMP Sprite Asset 和内嵌材质。用于 `<sprite name="名称">` 标签，不是 SFGen 的 TMP Font Asset；要求源 Sprite 名称唯一，并已导入 TMP Essential Resources 中的 Sprite Shader。
+- **SpriteAtlas 导出 SpriteSheet**：生成 Multiple 模式 PNG，并写入切片、Pivot 和 Border。
+- **Sprite 图片拆分为散图**：选择图片时导出全部切片；选择 Sprite 子资源时仅导出该切片，支持批量选择。保留 Pivot 和按导入尺寸缩放后的 Border。
+
+执行时选择当前项目 `Assets` 内的输出位置。每个输入创建独立的新目录，重复导出不会覆盖之前的资源；失败时清理当前输入的新目录，已成功导出的其他输入保留。源图片的 Read/Write 和其他导入设置保持不变。
+
+SpriteAtlas 导出与 SFGen 使用同一套原始资源读取和合图逻辑，不依赖 Pack Preview 或运行时打包结果；导出的排列、尺寸遵循源图片导入设置，不沿用 Atlas 的旋转、紧密打包、分页或变体缩放。单张合成图集容量限制同上。
