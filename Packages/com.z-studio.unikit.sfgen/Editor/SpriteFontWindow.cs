@@ -49,11 +49,9 @@ namespace ZStudio.UniKit.Editor {
 
         private void OnEnable() {
             minSize = new Vector2(900, 640);
-            if (m_Settings == null) {
-                SetSettings(CreateInstance<SpriteFontSettings>());
-            } else {
-                m_SerializedSettings = new SerializedObject(m_Settings);
-            }
+            
+            // 没有持久化配置时停留在起始页，不创建隐藏的临时配置。
+            SetSettings(EditorUtility.IsPersistent(m_Settings) ? m_Settings : null);
 
             EditorApplication.projectChanged += RequestRefresh;
             Undo.undoRedoPerformed += RequestRefresh;
@@ -82,11 +80,11 @@ namespace ZStudio.UniKit.Editor {
 
             m_Settings = settings;
 
-            if (!EditorUtility.IsPersistent(settings)) {
-                settings.hideFlags = HideFlags.HideAndDontSave;
-            }
-
-            m_SerializedSettings = new SerializedObject(settings);
+            m_Source?.Dispose();
+            m_Source = null;
+            m_Entries = null;
+            m_Sprites = null;
+            m_SerializedSettings = settings != null ? new SerializedObject(settings) : null;
             m_Page = 0;
             m_PreviewText = "";
             m_Result = null;
@@ -101,20 +99,23 @@ namespace ZStudio.UniKit.Editor {
 
         private void OnGUI() {
             if (m_Settings == null) {
-                SetSettings(CreateInstance<SpriteFontSettings>());
+                DrawStartPage();
+                return;
             }
 
             using (new EditorGUILayout.HorizontalScope(EditorStyles.toolbar)) {
+                GUILayout.Label("制作配置", GUILayout.Width(70));
+               
                 var selected = EditorGUILayout.ObjectField(EditorUtility.IsPersistent(m_Settings) ? m_Settings : null,
                     typeof(SpriteFontSettings), false) as SpriteFontSettings;
 
-                if (selected != null && selected != m_Settings) {
+                if (selected != m_Settings) {
                     SetSettings(selected);
                     GUI.FocusControl(null);
                     GUIUtility.ExitGUI();
                 }
 
-                if (GUILayout.Button("新建", EditorStyles.toolbarButton, GUILayout.Width(50))) {
+                if (GUILayout.Button("新建配置", EditorStyles.toolbarButton, GUILayout.Width(72))) {
                     CreateNewSettings();
                     GUIUtility.ExitGUI();
                 }
@@ -156,6 +157,45 @@ namespace ZStudio.UniKit.Editor {
                 m_NeedsRefresh = true;
                 Repaint();
             }
+        }
+
+        private void DrawStartPage() {
+            GUILayout.FlexibleSpace();
+
+            using (new EditorGUILayout.HorizontalScope()) {
+                GUILayout.FlexibleSpace();
+
+                using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox, GUILayout.Width(460))) {
+                    GUILayout.Space(16);
+                    EditorGUILayout.LabelField("开始制作 Sprite 字体", EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField("尚未分配制作配置。请先新建配置，或选择已有配置继续编辑。",
+                        EditorStyles.wordWrappedLabel);
+                    GUILayout.Space(16);
+
+                    if (GUILayout.Button("新建制作配置", GUILayout.Height(36))) {
+                        CreateNewSettings();
+                        GUIUtility.ExitGUI();
+                    }
+
+                    GUILayout.Space(12);
+                    EditorGUILayout.LabelField("选择已有配置", EditorStyles.boldLabel);
+                    var selected = EditorGUILayout.ObjectField(null, typeof(SpriteFontSettings), false) as SpriteFontSettings;
+
+                    if (selected != null) {
+                        SetSettings(selected);
+                        GUI.FocusControl(null);
+                        GUIUtility.ExitGUI();
+                    }
+
+                    EditorGUILayout.LabelField("可拖入配置资源、点击右侧圆圈选择，或在 Project 中双击配置。",
+                        EditorStyles.wordWrappedMiniLabel);
+                    GUILayout.Space(16);
+                }
+
+                GUILayout.FlexibleSpace();
+            }
+
+            GUILayout.FlexibleSpace();
         }
 
         private void CreateNewSettings() {
@@ -254,8 +294,13 @@ namespace ZStudio.UniKit.Editor {
         private void AddSpriteSources(UnityEngine.Object[] objects) {
             var added = new List<Sprite>();
 
-            foreach (var item in objects) {
-                SpriteFontSource.CollectSprites(item, added);
+            try {
+                foreach (var item in objects) {
+                    SpriteFontSource.CollectSprites(item, added);
+                }
+            } catch (InvalidOperationException exception) {
+                EditorUtility.DisplayDialog("无法添加 Sprite", exception.Message, "关闭");
+                return;
             }
 
             var sprites = m_SerializedSettings.FindProperty("SourceSprites");

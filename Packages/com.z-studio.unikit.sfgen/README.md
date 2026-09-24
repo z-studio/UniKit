@@ -16,7 +16,7 @@
 
 窗口采用左右布局：左侧编辑 Sprite 字符映射和排版参数，右侧实时预览，两栏独立滚动；底部保留生成与资源定位按钮。
 
-窗口顶部的“新建”会打开保存对话框，创建并打开一份独立的制作配置；取消对话框不会改变当前配置。也可以直接编辑初始面板，在首次生成时保存配置。
+首次打开或未分配制作配置时，窗口显示起始页。点击“新建制作配置”保存新配置，或选择、拖入已有配置后进入制作界面。取消保存会停留在起始页；清空顶部配置栏会返回起始页。已有配置下点击“新建配置”，取消保存不会改变当前配置。
 
 1. **选择来源**：选择 Sprite 纹理（Single / Multiple）、散图 Sprite 或 SpriteAtlas。散图支持拖入 Sprite、图片或文件夹；SpriteAtlas 直接读取 Objects for Packing 中的资源。Multiple 图片需先在 Sprite Editor 中切片并 Apply。
 2. **填写映射**：在需要使用的 Sprite 缩略图旁填写一个字符。例如在图片“1、3、9”旁分别填入 `1`、`3`、`9`，其余输入框留空。
@@ -121,9 +121,9 @@ Assets/Fonts/
 菜单 **Tools → UniKit → Sprite Atlas Tools** 提供三个独立入口，均在非运行模式使用：
 
 - **SpriteAtlas 导出 TMP Sprite Asset**：生成 PNG、TMP Sprite Asset 和内嵌材质。用于 `<sprite name="名称">` 标签，不是 SFGen 的 TMP Font Asset；要求源 Sprite 名称唯一，并已导入 TMP Essential Resources 中的 Sprite Shader。
-- **SpriteAtlas 导出 SpriteSheet**：生成 Multiple 模式 PNG，并写入切片、Pivot 和 Border。
-- **Sprite 图片拆分为散图**：选择图片时导出全部切片；选择 Sprite 子资源时仅导出该切片，支持批量选择。保留 Pivot 和按导入尺寸缩放后的 Border。
+- **SpriteAtlas 导出 Sprite 图片**：生成 Multiple 模式 PNG，并写入切片、Pivot 和 Border。
+- **Sprite 图片拆分为散图**：选择图片时导出全部切片；选择 Sprite 子资源时仅导出该切片，支持批量选择。保留源图片的 PPU、过滤模式、Pivot 和按导入尺寸缩放后的 Border；同时选中图片与其子 Sprite 时自动去重。
 
-执行时选择当前项目 `Assets` 内的输出位置。每个输入创建独立的新目录，重复导出不会覆盖之前的资源；失败时清理当前输入的新目录，已成功导出的其他输入保留。源图片的 Read/Write 和其他导入设置保持不变。
+执行时选择当前项目 `Assets` 内的输出位置。每个输入创建独立的新目录，重复导出不会覆盖之前的资源；单个输入失败时清理该输入的新目录，并继续处理其他输入，结束后汇总结果。进度条支持取消，取消时清理当前未完成输入，保留已完成结果；单次 Unity 打包或导入调用完成后才能响应取消。源图片的 Read/Write 和其他导入设置保持不变。Multiple 图片没有切片时，会明确列出图片路径，并提示切换 Single 或在 Sprite Editor 中切片。
 
 SpriteAtlas 导出与 SFGen 使用同一套原始资源读取和合图逻辑，不依赖 Pack Preview 或运行时打包结果；导出的排列、尺寸遵循源图片导入设置，不沿用 Atlas 的旋转、紧密打包、分页或变体缩放。单张合成图集容量限制同上。

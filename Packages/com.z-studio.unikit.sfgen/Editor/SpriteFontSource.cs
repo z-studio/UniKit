@@ -22,23 +22,34 @@ namespace ZStudio.UniKit.Editor {
         public int Height { get; private set; }
         public bool IsGenerated { get; private set; }
 
-        public static SpriteFontSource Load(SpriteFontSettings settings) {
+        public static SpriteFontSource Load(SpriteFontSettings settings) =>
+            Load(settings.Source, settings.Atlas, settings.SourceSprites, settings.SourceAtlas, settings.Order);
+
+        internal static SpriteFontSource Load(Texture2D texture) =>
+            Load(SpriteFontSourceType.Texture, texture, null, null, SpriteFontOrder.Name);
+
+        internal static SpriteFontSource Load(SpriteAtlas atlas, Action<string, float> progress = null) =>
+            Load(SpriteFontSourceType.SpriteAtlas, null, null, atlas, SpriteFontOrder.Name, progress);
+
+        private static SpriteFontSource Load(SpriteFontSourceType type, Texture2D texture,
+            List<Sprite> sourceSprites, SpriteAtlas sourceAtlas, SpriteFontOrder order,
+            Action<string, float> progress = null) {
             var source = new SpriteFontSource();
 
             try {
-                if (settings.Source == SpriteFontSourceType.Texture) {
-                    source.ReadTexture(settings.Atlas);
+                if (type == SpriteFontSourceType.Texture) {
+                    source.ReadTexture(texture);
                 } else {
                     var sprites = new List<Sprite>();
 
-                    if (settings.Source == SpriteFontSourceType.Sprites) {
-                        if (settings.SourceSprites.Any(sprite => sprite == null)) {
+                    if (type == SpriteFontSourceType.Sprites) {
+                        if (sourceSprites.Any(sprite => sprite == null)) {
                             throw new InvalidOperationException("散图列表中有空引用，请移除空项或重新指定 Sprite。");
                         }
 
-                        sprites.AddRange(settings.SourceSprites);
+                        sprites.AddRange(sourceSprites);
                     } else {
-                        var atlas = settings.SourceAtlas;
+                        var atlas = sourceAtlas;
                         var visited = new HashSet<SpriteAtlas>();
 
                         while (atlas != null && atlas.isVariant) {
@@ -58,10 +69,10 @@ namespace ZStudio.UniKit.Editor {
                         }
                     }
 
-                    source.Pack(sprites.Distinct().ToArray());
+                    source.Pack(sprites.Distinct().ToArray(), progress);
                 }
 
-                switch (settings.Order) {
+                switch (order) {
                     case SpriteFontOrder.Name:
                         Array.Sort(source.Sprites, (a, b) => {
                             var comparison = EditorUtility.NaturalCompare(a.name, b.name);
@@ -134,7 +145,13 @@ namespace ZStudio.UniKit.Editor {
             }
 
             provider.InitSpriteEditorDataProvider();
-            return provider.GetSpriteRects();
+            var rects = provider.GetSpriteRects();
+
+            if (importer.spriteImportMode == SpriteImportMode.Multiple && rects.Length == 0) {
+                throw new InvalidOperationException($"「{importer.assetPath}」为 Multiple 模式但没有切片。单张散图请改为 Single；图集请在 Sprite Editor 中切片并 Apply。");
+            }
+
+            return rects;
         }
 
         internal static void CollectSprites(Object asset, List<Sprite> result) {
@@ -148,15 +165,19 @@ namespace ZStudio.UniKit.Editor {
             if (AssetDatabase.IsValidFolder(path)) {
                 foreach (var guid in AssetDatabase.FindAssets("t:Texture2D", new[] { path })
                              .OrderBy(AssetDatabase.GUIDToAssetPath, StringComparer.Ordinal)) {
-                    result.AddRange(AssetDatabase.LoadAllAssetsAtPath(AssetDatabase.GUIDToAssetPath(guid))
-                        .OfType<Sprite>());
+                    CollectSprites(AssetDatabase.LoadAssetAtPath<Texture2D>(AssetDatabase.GUIDToAssetPath(guid)), result);
                 }
             } else if (asset is Texture2D) {
+                if (AssetImporter.GetAtPath(path) is TextureImporter importer &&
+                    importer.textureType == TextureImporterType.Sprite) {
+                    ReadRects(importer);
+                }
+
                 result.AddRange(AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>());
             }
         }
 
-        private void Pack(Sprite[] sprites) {
+        private void Pack(Sprite[] sprites, Action<string, float> progress) {
             if (sprites.Length == 0) {
                 throw new InvalidOperationException("来源中没有 Sprite。请添加散图，或为 SpriteAtlas 配置 Objects for Packing。");
             }
@@ -167,6 +188,7 @@ namespace ZStudio.UniKit.Editor {
 
             try {
                 foreach (var sprite in sprites) {
+                    progress?.Invoke(sprite.name, (float)crops.Count / sprites.Length);
                     var path = AssetDatabase.GetAssetPath(sprite);
                     var importer = AssetImporter.GetAtPath(path) as TextureImporter;
 
@@ -183,7 +205,7 @@ namespace ZStudio.UniKit.Editor {
 
                     if (!readableTextures.TryGetValue(path, out var readable)) {
                         // 读取图片主资源，而不是 sprite.texture（后者可能已被 SpriteAtlas 替换）。
-                        readable = SpriteAtlasTools.CopyReadableTexture(AssetDatabase.LoadAssetAtPath<Texture2D>(path));
+                        readable = CopyReadableTexture(AssetDatabase.LoadAssetAtPath<Texture2D>(path));
                         readableTextures.Add(path, readable);
                     }
 
@@ -256,6 +278,35 @@ namespace ZStudio.UniKit.Editor {
                 foreach (var readable in readableTextures.Values) {
                     Object.DestroyImmediate(readable);
                 }
+            }
+        }
+
+        /// <summary>GPU 回读源纹理，不修改 Read/Write；完整恢复全局渲染状态并释放临时资源。</summary>
+        internal static Texture2D CopyReadableTexture(Texture2D source) {
+            var previous = RenderTexture.active;
+            var previousSRGB = GL.sRGBWrite;
+            var target = RenderTexture.GetTemporary(source.width, source.height, 0,
+                RenderTextureFormat.ARGB32, RenderTextureReadWrite.sRGB);
+            Texture2D copy = null;
+
+            try {
+                GL.sRGBWrite = QualitySettings.activeColorSpace == ColorSpace.Linear;
+                Graphics.Blit(source, target);
+                RenderTexture.active = target;
+                copy = new Texture2D(source.width, source.height, TextureFormat.RGBA32, false);
+                copy.ReadPixels(new Rect(0, 0, source.width, source.height), 0, 0);
+                copy.Apply();
+                return copy;
+            } catch {
+                if (copy != null) {
+                    Object.DestroyImmediate(copy);
+                }
+
+                throw;
+            } finally {
+                RenderTexture.active = previous;
+                GL.sRGBWrite = previousSRGB;
+                RenderTexture.ReleaseTemporary(target);
             }
         }
 
