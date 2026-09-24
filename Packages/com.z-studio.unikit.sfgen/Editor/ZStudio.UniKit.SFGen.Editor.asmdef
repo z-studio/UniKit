@@ -1,5 +1,5 @@
 {
-    "name": "ZStudio.UniKit.BitmapFontBuilder",
+    "name": "ZStudio.UniKit.SFGen.Editor",
     "rootNamespace": "ZStudio.UniKit",
     "references": [
         "Unity.TextMeshPro",
