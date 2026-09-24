@@ -1,0 +1,13 @@
+{
+  "name": "com.z-studio.unikit.ui.banner-carousel",
+  "displayName": "UI Banner Carousel",
+  "version": "1.0.0",
+  "unity": "6000.0",
+  "description": "UGUI banner carousel with mixed sprite and prefab pages, optional Spine integration, drag gestures, playback modes and customizable indicators.",
+  "author": {
+    "name": "Z Studio"
+  },
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  }
+}

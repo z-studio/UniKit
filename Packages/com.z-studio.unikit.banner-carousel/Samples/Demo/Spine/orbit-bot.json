@@ -1,0 +1,327 @@
+{
+  "skeleton": {
+    "hash": "unikit-original-orbit-bot",
+    "spine": "4.2.0",
+    "width": 440,
+    "height": 420
+  },
+  "bones": [
+    {
+      "name": "root"
+    },
+    {
+      "name": "float",
+      "parent": "root"
+    },
+    {
+      "name": "left-leg",
+      "parent": "float",
+      "x": -45,
+      "y": -88
+    },
+    {
+      "name": "right-leg",
+      "parent": "float",
+      "x": 45,
+      "y": -88
+    },
+    {
+      "name": "left-arm",
+      "parent": "float",
+      "x": -93,
+      "y": 46,
+      "rotation": -12
+    },
+    {
+      "name": "right-arm",
+      "parent": "float",
+      "x": 93,
+      "y": 46,
+      "rotation": 18
+    },
+    {
+      "name": "body",
+      "parent": "float"
+    },
+    {
+      "name": "head",
+      "parent": "float",
+      "y": 124
+    },
+    {
+      "name": "antenna",
+      "parent": "head",
+      "y": 89
+    },
+    {
+      "name": "orbit",
+      "parent": "root"
+    },
+    {
+      "name": "orb-a",
+      "parent": "orbit",
+      "x": -184,
+      "y": 90
+    },
+    {
+      "name": "orb-b",
+      "parent": "orbit",
+      "x": 176,
+      "y": -85
+    }
+  ],
+  "slots": [
+    {
+      "name": "left-leg",
+      "bone": "left-leg",
+      "attachment": "boot"
+    },
+    {
+      "name": "right-leg",
+      "bone": "right-leg",
+      "attachment": "boot"
+    },
+    {
+      "name": "left-arm",
+      "bone": "left-arm",
+      "attachment": "arm"
+    },
+    {
+      "name": "right-arm",
+      "bone": "right-arm",
+      "attachment": "arm"
+    },
+    {
+      "name": "body",
+      "bone": "body",
+      "attachment": "body"
+    },
+    {
+      "name": "head",
+      "bone": "head",
+      "attachment": "head"
+    },
+    {
+      "name": "antenna",
+      "bone": "antenna",
+      "attachment": "antenna"
+    },
+    {
+      "name": "orb-a",
+      "bone": "orb-a",
+      "attachment": "orb"
+    },
+    {
+      "name": "orb-b",
+      "bone": "orb-b",
+      "attachment": "orb"
+    }
+  ],
+  "skins": [
+    {
+      "name": "default",
+      "attachments": {
+        "left-leg": {
+          "boot": {
+            "type": "region",
+            "path": "boot",
+            "width": 74,
+            "height": 74,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "right-leg": {
+          "boot": {
+            "type": "region",
+            "path": "boot",
+            "width": 74,
+            "height": 74,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "left-arm": {
+          "arm": {
+            "type": "region",
+            "path": "arm",
+            "width": 70,
+            "height": 140,
+            "x": 0,
+            "y": -50
+          }
+        },
+        "right-arm": {
+          "arm": {
+            "type": "region",
+            "path": "arm",
+            "width": 70,
+            "height": 140,
+            "x": 0,
+            "y": -50
+          }
+        },
+        "body": {
+          "body": {
+            "type": "region",
+            "path": "body",
+            "width": 218,
+            "height": 218,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "head": {
+          "head": {
+            "type": "region",
+            "path": "head",
+            "width": 220,
+            "height": 220,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "antenna": {
+          "antenna": {
+            "type": "region",
+            "path": "antenna",
+            "width": 75,
+            "height": 75,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "orb-a": {
+          "orb": {
+            "type": "region",
+            "path": "orb",
+            "width": 32,
+            "height": 32,
+            "x": 0,
+            "y": 0
+          }
+        },
+        "orb-b": {
+          "orb": {
+            "type": "region",
+            "path": "orb",
+            "width": 20,
+            "height": 20,
+            "x": 0,
+            "y": 0
+          }
+        }
+      }
+    }
+  ],
+  "animations": {
+    "welcome": {
+      "bones": {
+        "float": {
+          "translate": [
+            {
+              "y": 0
+            },
+            {
+              "time": 1.5,
+              "y": 10
+            },
+            {
+              "time": 3,
+              "y": 0
+            }
+          ],
+          "rotate": [
+            {
+              "value": -2
+            },
+            {
+              "time": 1.5,
+              "value": 2
+            },
+            {
+              "time": 3,
+              "value": -2
+            }
+          ]
+        },
+        "head": {
+          "rotate": [
+            {
+              "value": -4
+            },
+            {
+              "time": 1.5,
+              "value": 5
+            },
+            {
+              "time": 3,
+              "value": -4
+            }
+          ]
+        },
+        "right-arm": {
+          "rotate": [
+            {
+              "value": 20
+            },
+            {
+              "time": 0.6,
+              "value": 105
+            },
+            {
+              "time": 1,
+              "value": 78
+            },
+            {
+              "time": 1.4,
+              "value": 110
+            },
+            {
+              "time": 1.8,
+              "value": 78
+            },
+            {
+              "time": 2.2,
+              "value": 105
+            },
+            {
+              "time": 3,
+              "value": 20
+            }
+          ]
+        },
+        "left-arm": {
+          "rotate": [
+            {
+              "value": -5
+            },
+            {
+              "time": 1.5,
+              "value": -20
+            },
+            {
+              "time": 3,
+              "value": -5
+            }
+          ]
+        },
+        "orbit": {
+          "rotate": [
+            {
+              "value": 0
+            },
+            {
+              "time": 1.5,
+              "value": 12
+            },
+            {
+              "time": 3,
+              "value": 0
+            }
+          ]
+        }
+      }
+    }
+  }
+}

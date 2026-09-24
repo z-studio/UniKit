@@ -1,0 +1,27 @@
+{
+    "name": "ZStudio.UniKit.UI.BannerCarousel.Spine",
+    "rootNamespace": "ZStudio.UniKit.UI",
+    "references": [
+        "ZStudio.UniKit.UI.BannerCarousel",
+        "spine-unity",
+        "spine-csharp",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "UI_BANNER_CAROUSEL_SPINE"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.esotericsoftware.spine.spine-unity",
+            "expression": "",
+            "define": "UI_BANNER_CAROUSEL_SPINE"
+        }
+    ],
+    "noEngineReferences": false
+}

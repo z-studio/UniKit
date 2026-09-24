@@ -1,0 +1,17 @@
+{
+    "name": "ZStudio.UniKit.UI.BannerCarousel.Samples",
+    "rootNamespace": "ZStudio.UniKit.UI",
+    "references": [
+        "ZStudio.UniKit.UI.BannerCarousel",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
