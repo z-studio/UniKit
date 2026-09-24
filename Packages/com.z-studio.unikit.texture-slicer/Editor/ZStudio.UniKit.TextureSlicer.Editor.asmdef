@@ -1,0 +1,7 @@
+{
+  "name": "ZStudio.UniKit.TextureSlicer.Editor",
+  "rootNamespace": "ZStudio.UniKit",
+  "includePlatforms": ["Editor"],
+  "references": [],
+  "autoReferenced": true
+}

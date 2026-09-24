@@ -238,6 +238,12 @@
         "com.unity.2d.sprite": "1.0.0"
       }
     },
+    "com.z-studio.unikit.texture-slicer": {
+      "version": "file:com.z-studio.unikit.texture-slicer",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.z-studio.unikit.ui.marquee": {
       "version": "file:com.z-studio.unikit.ui.marquee",
       "depth": 0,
