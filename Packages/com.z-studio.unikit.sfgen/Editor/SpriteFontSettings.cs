@@ -27,11 +27,11 @@ namespace ZStudio.UniKit.Editor {
     internal sealed class SpriteFontSettings : ScriptableObject {
         public Texture2D Atlas;
         // 绑定 Sprite 的稳定 ID，列表排序和切片改名都不改变字符映射。
-        public List<SpriteFontCharacter> Mappings = new List<SpriteFontCharacter>();
+        public List<SpriteFontCharacter> Mappings = new();
         public SpriteFontOrder Order = SpriteFontOrder.Name;
-        public SpriteFontOutput Output = SpriteFontOutput.Both;
+        public SpriteFontOutput Output = SpriteFontOutput.TextMeshPro;
         public int FontSize = 32;
-        public bool NormalizeHeight = true;
+        public bool NormalizeHeight;
         public int Baseline;
         public int LetterSpacing;
         public int LineSpacing;
