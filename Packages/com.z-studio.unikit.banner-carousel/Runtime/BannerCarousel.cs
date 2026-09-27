@@ -22,7 +22,7 @@ namespace ZStudio.UniKit.UI {
         [Header("内容")] [Tooltip("按播放顺序配置图片页或 UI 预制体页面。")] [SerializeField]
         private BannerPage[] m_Pages = Array.Empty<BannerPage>();
 
-        [Tooltip("视口应保持为实际可见尺寸，不要添加 LayoutGroup。留空时使用当前物体。")] [SerializeField]
+        [Tooltip("视口必须是当前物体或其子节点，保持实际可见尺寸且不要添加 LayoutGroup。留空时使用当前物体。")] [SerializeField]
         private RectTransform m_Content;
 
         [SerializeField] private bool m_ClipContent = true;
@@ -109,7 +109,8 @@ namespace ZStudio.UniKit.UI {
         /// <summary>是否满足自动播放条件；实际倒计时还会等待拖拽和过渡结束。</summary>
         public bool IsPlaying =>
             isActiveAndEnabled && m_AutoPlay && !IsPaused && !m_Completed
-            && !(m_PauseOnHover && m_Hovered) && Count > 1;
+            && !(m_PauseOnHover && m_Hovered)
+            && (Count > 1 || (Count == 1 && m_PlaybackMode == BannerPlaybackMode.Once));
 
         /// <summary>当前页的停留进度（0～1），不包含过渡动画进度。</summary>
         public float Progress => Count == 0 ? 0f : Mathf.Clamp01(m_DwellTime / CurrentDuration);
@@ -257,6 +258,12 @@ namespace ZStudio.UniKit.UI {
             m_AutoDirection = 1;
             m_Completed = false;
             m_Viewport = m_Content != null ? m_Content : (RectTransform)transform;
+
+            // 指针事件沿父层级传递，其他分支的视口无法将点击和拖拽交给本组件。
+            if (!m_Viewport.IsChildOf(transform)) {
+                Debug.LogWarning("[BannerCarousel] Content must be this transform or a descendant; using this transform instead.", this);
+                m_Viewport = (RectTransform)transform;
+            }
 
             // 使用独立根节点管理页面，避免移动或删除调用方配置的装饰节点。
             if (m_PageRoot == null) {

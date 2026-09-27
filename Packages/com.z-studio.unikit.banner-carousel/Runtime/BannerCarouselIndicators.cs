@@ -93,7 +93,30 @@ namespace ZStudio.UniKit.UI {
         /// <summary>本组件的显示开关；最终还受轮播总开关和单页隐藏配置约束。</summary>
         public bool Visible {
             get => m_Visible;
-            set => m_Visible = value;
+            set {
+                m_Visible = value;
+                RefreshVisibility();
+            }
+        }
+
+        private bool ShouldShow => isActiveAndEnabled && m_Visible && m_Carousel != null
+                                   && m_Carousel.ShowIndicators
+                                   && (!m_HideForSinglePage || m_Carousel.Count > 1);
+
+        private void OnEnable() => RefreshVisibility();
+
+        // 属性赋值和重建可能发生在禁用期间，不能只依赖 LateUpdate 隐藏新实例。
+        private void RefreshVisibility() {
+            bool visible = ShouldShow;
+
+            foreach (var button in m_Buttons) {
+                if (button == null) {
+                    continue;
+                }
+
+                button.gameObject.SetActive(visible);
+                button.interactable = visible && m_Clickable && !m_Carousel.IsTransitioning;
+            }
         }
 
         private void LateUpdate() {
@@ -104,8 +127,7 @@ namespace ZStudio.UniKit.UI {
                 Rebuild();
             }
 
-            bool visible = m_Visible && m_Carousel != null && m_Carousel.ShowIndicators
-                           && (!m_HideForSinglePage || count > 1);
+            bool visible = ShouldShow;
 
             for (var i = 0; i < m_Buttons.Count; i++) {
                 var button = m_Buttons[i];
@@ -132,9 +154,10 @@ namespace ZStudio.UniKit.UI {
                     button.GetComponent<Image>().color = m_NormalColor;
                 }
 
-                // 只有当前页显示停留进度；单页没有自动翻页，直接显示完整填充。
+                // 单页 Once 仍有停留与完成进度；其他单页模式直接显示完整填充。
                 image.fillAmount = m_Style == IndicatorStyle.Progress
-                    ? (selected ? (count == 1 ? 1f : m_Carousel.Progress) : 0f) : 1f;
+                    ? (selected ? (count == 1 && m_Carousel.PlaybackMode != BannerPlaybackMode.Once
+                        ? 1f : m_Carousel.Progress) : 0f) : 1f;
             }
         }
 
@@ -200,15 +223,13 @@ namespace ZStudio.UniKit.UI {
                 m_Buttons.Add(button);
                 m_Images.Add(button.targetGraphic as Image);
             }
+
+            RefreshVisibility();
         }
 
         private void OnDisable() {
             // 容器可能位于外部层级；禁用组件时也要隐藏实例，但保留它们供再次启用时使用。
-            foreach (var button in m_Buttons) {
-                if (button != null) {
-                    button.gameObject.SetActive(false);
-                }
-            }
+            RefreshVisibility();
         }
 
         private void OnDestroy() => Clear();

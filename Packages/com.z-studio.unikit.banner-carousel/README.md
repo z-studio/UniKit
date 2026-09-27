@@ -2,6 +2,14 @@
 
 UGUI 轮播组件，支持 Sprite、Spine 和图片＋动画＋文字＋按钮组成的复合页面。
 
+## 最小 UGUI 示例
+
+打开 **`Samples/Demo/Scenes/MinimalDemo.unity`** 并运行。场景中的 `MinimalDemo` 脚本创建三张图片的轮播、上一页/下一页按钮、暂停/恢复按钮和圆点指示器，可直接参考其接入代码；不需要 Spine 或 Input System。
+
+该示例自动适配项目的输入配置：启用新 Input System 时使用 `InputSystemUIInputModule` 及默认 UI actions；只启用旧输入时使用 `StandaloneInputModule`；Both 模式优先使用新输入。已有可用 EventSystem 时直接复用，无需手动改项目设置或绑定输入动作。
+
+新输入适配位于 `Samples/Demo/Scripts/InputSystem` 独立可选程序集，仅在安装并启用 Input System 时参与编译。复制示例到新输入系统项目时请保留该目录；纯 UGUI 项目不需要安装 Input System。
+
 ## 直接体验 Demo
 
 打开 **`Samples/Demo/Scenes/Demo.unity`**，点击 Unity 的 **Play**，不需要手动添加素材或绑定引用。
@@ -34,7 +42,7 @@ UGUI 轮播组件，支持 Sprite、Spine 和图片＋动画＋文字＋按钮�
 
 1. 在 Canvas 下创建有确定宽高的 RectTransform，添加 `BannerCarousel`。Canvas 需要 GraphicRaycaster，场景需要 EventSystem 和对应输入模块。
 2. 在 **Pages** 中按顺序添加页面。图片填写 Sprite；复合页填写根节点为 RectTransform 的 Prefab。两者同时填写时使用 Prefab。`Duration = 0` 使用全局停留时间。
-3. `Content` 留空时以组件自身为视口，默认自动裁切。不要在视口上放 LayoutGroup；导航按钮、指示器、固定装饰应放在视口外。
+3. `Content` 留空时以组件自身为视口，默认自动裁切。指定时必须是组件自身或其子节点，以便指针事件沿父层级传到轮播；其他分支的引用会在 Rebuild 时警告并回退到组件自身。不要在视口上放 LayoutGroup；导航按钮、指示器、固定装饰应放在视口外。
 4. 导航按钮绑定 `Previous()` / `Next()`。指示器添加 `BannerCarouselIndicators` 并指定 Carousel。
 
 Pages 是唯一的内容入口；指示器统一使用独立组件。轮播内部创建独立容器，不移动或删除调用方的装饰节点。页面根节点拉伸到视口，在子节点中配置具体布局。
@@ -53,14 +61,14 @@ IntroPage (RectTransform)
 
 - **Loop**：首尾连续循环，双页同样支持双向切换。
 - **PingPong**：自动顺序为 0 → 1 → 2 → 1 → 0，不重复停留端点；手动导航在边界停止。
-- **Once**：播到末页并完成该页停留后触发一次 `OnPlaybackCompleted`。
+- **Once**：播到末页并完成该页停留后触发一次 `OnPlaybackCompleted`；只有一页时也会正常计时并通知完成。`Play()` 可重置计时并再次播放。
 - 停留时间从过渡完成后开始计时，不包含切换时间。逐页 Duration 可覆盖默认值。
 - 四个方向表示内容的移动方向；下一页始终为索引 +1。
 - 拖动距离使用视口本地 UI 单位，适配 Canvas 缩放；轻扫阈值设为 0 可禁用轻扫。所有过渡模式下拖动都跟手滑动。
 - 手动切换和回弹完成后重新计时；短拖动不会触发点击或选中事件。非循环边界有阻尼回弹。
 - 过渡期间忽略新的动画切换请求；`GoTo(index, false)` 可立即中断并跳转。
 - Pause 保留倒计时，当前过渡仍会完成。禁用时取消未完成的过渡；启用后恢复已选页并重新计时，显式 Pause 状态保留。
-- 空列表保留组件，单页不自动翻页。无效空页面被过滤，API 索引对应过滤后的列表。
+- 空列表保留组件，单页不自动翻页；单页 Loop / PingPong 不计时，单页 Once 仍计算停留进度。无效空页面被过滤，API 索引对应过滤后的列表。
 
 页面按索引按需创建和缓存，离屏时停用。循环切换不重复 Instantiate，也不为双页循环复制 Spine 实例。SetPages / Rebuild 清理旧实例；适用于有限数量的 Banner 和介绍页。
 
@@ -93,6 +101,8 @@ IntroPage (RectTransform)
 自定义模板的 Target Graphic 应为 Image；进度样式需要非空 Sprite 并设为 Filled，底图可放在独立节点。`Style`、`Template`、`Size` 属性改变时自动重建；`SelectedColor` 实时更新。Inspector 中修改模板或布局后，运行时调用 Rebuild 应用。
 
 指示器放在独立容器中，不能放进轮播页。`BannerCarousel.ShowIndicators` 控制整个轮播的指示器显示。
+
+禁用指示器组件或设置 `Visible = false` 会立即隐藏其按钮；禁用期间修改样式、尺寸、模板或调用 Rebuild，新实例也保持隐藏。单页默认隐藏指示器；关闭 Hide For Single Page 后，Progress 样式在 Once 模式下显示实际停留进度，Loop / PingPong 则显示完整填充。
 
 ## API
 
