@@ -19,41 +19,72 @@ namespace ZStudio.UniKit.UI {
             BottomToTop
         }
 
-        [Header("内容")] [Tooltip("按播放顺序配置图片页或 UI 预制体页面。")] [SerializeField]
+        [Header("内容")]
+        [Tooltip("按播放顺序配置图片页或 UI 预制体页面。")]
+        [SerializeField]
         private BannerPage[] m_Pages = Array.Empty<BannerPage>();
 
-        [Tooltip("视口必须是当前物体或其子节点，保持实际可见尺寸且不要添加 LayoutGroup。留空时使用当前物体。")] [SerializeField]
+        [Tooltip("视口必须是当前物体或其子节点，保持实际可见尺寸且不要添加 LayoutGroup。留空时使用当前物体。")]
+        [SerializeField]
         private RectTransform m_Content;
 
-        [SerializeField] private bool m_ClipContent = true;
-        [SerializeField, Min(0)] private int m_InitialIndex;
+        [SerializeField]
+        private bool m_ClipContent = true;
 
-        [Header("播放")] [SerializeField] private BannerPlaybackMode m_PlaybackMode = BannerPlaybackMode.Loop;
-        [SerializeField] private bool m_AutoPlay = true;
-        [SerializeField, Min(0.01f)] private float m_AutoSlideInterval = 3f;
-        [SerializeField] private bool m_UseUnscaledTime = true;
-        [SerializeField] private bool m_PauseOnHover;
+        [SerializeField, Min(0)]
+        private int m_InitialIndex;
 
-        [Header("过渡")] [SerializeField] private SlideDirection m_SlideDirection = SlideDirection.RightToLeft;
-        [SerializeField] private BannerTransition m_Transition = BannerTransition.Slide;
-        [SerializeField, Min(0f)] private float m_SlideDuration = 0.3f;
-        [SerializeField] private AnimationCurve m_Ease = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+        [Header("播放")]
+        [SerializeField]
+        private BannerPlaybackMode m_PlaybackMode = BannerPlaybackMode.Loop;
 
-        [Header("交互")] [SerializeField] private bool m_AllowDrag = true;
+        [SerializeField]
+        private bool m_AutoPlay = true;
 
-        [Tooltip("触发翻页所需的拖动距离，使用视口本地 UI 单位，实际阈值不超过半页。")] [SerializeField, Min(1f)]
+        [SerializeField, Min(0.01f)]
+        private float m_AutoSlideInterval = 3f;
+
+        [SerializeField]
+        private bool m_UseUnscaledTime = true;
+
+        [SerializeField]
+        private bool m_PauseOnHover;
+
+        [Header("过渡")]
+        [SerializeField]
+        private SlideDirection m_SlideDirection = SlideDirection.RightToLeft;
+
+        [SerializeField]
+        private BannerTransition m_Transition = BannerTransition.Slide;
+
+        [SerializeField, Min(0f)]
+        private float m_SlideDuration = 0.3f;
+
+        [SerializeField]
+        private AnimationCurve m_Ease = AnimationCurve.EaseInOut(0f, 0f, 1f, 1f);
+
+        [Header("交互")]
+        [SerializeField]
+        private bool m_AllowDrag = true;
+
+        [Tooltip("触发翻页所需的拖动距离，使用视口本地 UI 单位，实际阈值不超过半页。")]
+        [SerializeField, Min(1f)]
         private float m_DragThreshold = 150f;
 
-        [Tooltip("触发轻扫翻页的最低速度，单位为本地 UI 单位/秒；设为 0 时禁用轻扫。")] [SerializeField, Min(0f)]
+        [Tooltip("触发轻扫翻页的最低速度，单位为本地 UI 单位/秒；设为 0 时禁用轻扫。")]
+        [SerializeField, Min(0f)]
         private float m_FlickVelocity = 600f;
 
-        [Header("指示器")] [SerializeField] private bool m_ShowIndicators = true;
+        [Header("指示器")]
+        [SerializeField]
+        private bool m_ShowIndicators = true;
 
         [Header("事件")]
         /// <summary>非拖拽的页面点击事件，参数为当前有效页面索引。</summary>
         public UnityEvent<int> OnBannerClicked = new();
 
-        [Tooltip("初始选中及每次自动或手动切换完成后触发。")] public UnityEvent<int> OnBannerChanged = new();
+        [Tooltip("初始选中及每次自动或手动切换完成后触发。")]
+        public UnityEvent<int> OnBannerChanged = new();
 
         /// <summary>单次播放模式下，末页停留结束时触发一次。</summary>
         public UnityEvent OnPlaybackCompleted = new();
@@ -199,7 +230,8 @@ namespace ZStudio.UniKit.UI {
 
         private float CurrentDuration =>
             CurrentIndex >= 0 && m_Items[CurrentIndex].Duration > 0f
-                ? m_Items[CurrentIndex].Duration : Mathf.Max(0.01f, m_AutoSlideInterval);
+                ? m_Items[CurrentIndex].Duration
+                : Mathf.Max(0.01f, m_AutoSlideInterval);
 
         private bool IsHorizontal => m_SlideDirection is SlideDirection.LeftToRight or SlideDirection.RightToLeft;
 
@@ -261,7 +293,9 @@ namespace ZStudio.UniKit.UI {
 
             // 指针事件沿父层级传递，其他分支的视口无法将点击和拖拽交给本组件。
             if (!m_Viewport.IsChildOf(transform)) {
-                Debug.LogWarning("[BannerCarousel] Content must be this transform or a descendant; using this transform instead.", this);
+                Debug.LogWarning(
+                    "[BannerCarousel] Content must be this transform or a descendant; using this transform instead.",
+                    this);
                 m_Viewport = (RectTransform)transform;
             }
 
@@ -410,7 +444,8 @@ namespace ZStudio.UniKit.UI {
                 if (t >= 1f) {
                     FinishMotion();
                 }
-            } else if (!m_IsDragging && IsPlaying) {
+            }
+            else if (!m_IsDragging && IsPlaying) {
                 m_DwellTime += delta;
 
                 if (m_DwellTime >= CurrentDuration) {
@@ -462,7 +497,8 @@ namespace ZStudio.UniKit.UI {
 
             if (immediate || m_SlideDuration <= 0f || (!m_DragTransition && m_Transition == BannerTransition.Instant)) {
                 FinishMotion();
-            } else {
+            }
+            else {
                 RenderMotion(m_Offset);
             }
         }
@@ -492,7 +528,8 @@ namespace ZStudio.UniKit.UI {
                 m_Current = m_Incoming;
                 CurrentIndex = m_TargetIndex;
                 m_Incoming = null;
-            } else {
+            }
+            else {
                 Hide(m_Incoming);
                 m_Incoming = null;
             }
@@ -573,7 +610,8 @@ namespace ZStudio.UniKit.UI {
             if (target >= 0) {
                 m_IncomingDirection = direction;
                 PrepareIncoming(target, direction);
-            } else {
+            }
+            else {
                 Hide(m_Incoming);
                 m_Incoming = null;
             }
@@ -601,7 +639,8 @@ namespace ZStudio.UniKit.UI {
             if (m_Incoming != null && (Mathf.Abs(distance) >= Mathf.Min(m_DragThreshold, PageSize * 0.5f) || flick)) {
                 m_Completed = false;
                 BeginMotion(m_IncomingDirection, false);
-            } else {
+            }
+            else {
                 m_SnapBack = true;
                 m_AnimationFrom = m_Offset;
                 m_AnimationTo = 0f;
@@ -648,7 +687,8 @@ namespace ZStudio.UniKit.UI {
                 var content = Instantiate(page.Prefab, rt, false);
                 Stretch(content);
                 content.gameObject.SetActive(true);
-            } else {
+            }
+            else {
                 var content = new GameObject("Image", typeof(RectTransform), typeof(Image));
                 content.transform.SetParent(rt, false);
                 Stretch((RectTransform)content.transform);
@@ -725,7 +765,8 @@ namespace ZStudio.UniKit.UI {
         private static void DestroyOwned(GameObject target) {
             if (Application.isPlaying) {
                 Destroy(target);
-            } else {
+            }
+            else {
                 DestroyImmediate(target);
             }
         }

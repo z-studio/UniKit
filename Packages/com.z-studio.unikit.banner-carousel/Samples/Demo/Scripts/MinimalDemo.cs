@@ -8,7 +8,9 @@ namespace ZStudio.UniKit.UI.Samples {
         // 可选输入适配程序集在场景加载前注册，示例本身仍只依赖 UGUI。
         public static System.Action<GameObject> ConfigureInputModule { private get; set; }
 
-        [SerializeField] private Sprite[] m_Images;
+        [SerializeField]
+        private Sprite[] m_Images;
+
         private BannerCarousel m_Carousel;
         private Text m_Status;
         private Font m_Font;
@@ -51,6 +53,7 @@ namespace ZStudio.UniKit.UI.Samples {
             m_Status = Label("Status", canvas.transform, "", new Vector2(0f, -280f), new Vector2(850f, 35f));
 
             var events = EventSystem.current;
+
             if (events == null) {
                 events = new GameObject("EventSystem", typeof(EventSystem)).GetComponent<EventSystem>();
                 events.transform.SetParent(transform, false);
@@ -63,7 +66,8 @@ namespace ZStudio.UniKit.UI.Samples {
 
             if (ConfigureInputModule != null) {
                 ConfigureInputModule(events.gameObject);
-            } else {
+            }
+            else {
 #if ENABLE_LEGACY_INPUT_MANAGER
                 events.gameObject.AddComponent<StandaloneInputModule>();
 #else
