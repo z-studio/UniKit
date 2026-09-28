@@ -17,5 +17,5 @@
     "com.unity.ugui": "2.0.0",
     "com.unity.2d.sprite": "1.0.0"
   },
-  "description": "将 Sprite 纹理、散图或 SpriteAtlas 制作成 UGUI Text 和 TextMeshPro 可用的彩色位图字体。支持自动合成字体图集、按 Sprite 选择字符、排版预览、制作配置保存及保留资源引用的字体更新，无需额外基础字体或开启纹理读写。"
+  "description": "Convert Sprite textures, individual sprites, or SpriteAtlases into color bitmap fonts usable by both UGUI Text and TextMeshPro. It supports automatic font-atlas composition, character selection from sprites, layout preview, saving generation presets, and font updates that preserve asset references — with no additional base font required and no need to enable texture read/write."
 }

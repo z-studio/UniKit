@@ -2,7 +2,7 @@
   "name": "com.z-studio.unikit.ui.marquee",
   "version": "1.0.0",
   "displayName": "UI Marquee",
-  "description": "基于 UGUI 的跑马灯组件，支持文本、图片混排，以及逐条轮播和无缝连续滚动。可配置四向滚动、速度、间距、停留时长与缓动，提供播放控制、事件回调和异步等待。支持自定义内容片段，并可选接入 Spine 动画，适用于公告、消息轮播和动态信息展示。",
+  "description": "A UGUI-based marquee component that supports mixed text and image layouts, as well as per-item carousel and seamless continuous scrolling. It offers configurable four-direction scrolling, speed, spacing, dwell time, and easing, along with playback controls, event callbacks, and async waiting. It supports custom content segments with optional Spine animation integration, making it suitable for announcements, message tickers, and dynamic information displays.",
   "unity": "6000.0",
   "author": {
     "name": "Z Studio"

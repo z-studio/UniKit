@@ -13,5 +13,5 @@
     "name": "Z Studio"
   },
   "dependencies": {},
-  "description": "支持大图分块与行列均分的纹理切割工具。提供交互预览、重叠边、透明裁剪、切片排除、PNG 与 Sprite 导出及坐标清单，不修改源图片导入设置。"
+  "description": "A texture slicing tool that supports large-image tiling and even row/column division. It provides an interactive preview, overlapping edges, transparent cropping, slice exclusion, PNG and Sprite export, and coordinate lists, without modifying the source image's import settings."
 }

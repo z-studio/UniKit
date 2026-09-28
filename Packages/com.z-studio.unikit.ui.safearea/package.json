@@ -2,7 +2,7 @@
   "name": "com.z-studio.unikit.ui.safearea",
   "version": "1.0.0",
   "displayName": "UI Safe Area",
-  "description": "适用于 Unity 6.0 及以上版本的 uGUI 安全区布局组件。支持容器按指定边缘适配安全区、自定义内边距、居中对齐及参考方向映射；支持子元素外扩或保持尺寸平移，实现向非安全区域延伸的布局，并随窗口尺寸、屏幕方向和安全区变化自动更新。",
+  "description": "A uGUI safe-area layout component for Unity 6.0 and above. It supports adapting a container to the safe area based on specified edges, with custom padding, center alignment, and reference-direction mapping. It also supports expanding children outward or translating them while preserving their size, enabling layouts that extend into non-safe areas, and automatically updates in response to changes in window size, screen orientation, and the safe area.",
   "unity": "6000.0",
   "keywords": [
     "ui",
