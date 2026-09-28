@@ -19,44 +19,58 @@ namespace ZStudio.UniKit {
         // 标记设计参考值是否已采集，防止每次加载都用相机当前结果覆盖配置。
         private const int k_CurrentSerializedVersion = 1;
 
-        [Tooltip("设计内容时使用的参考分辨率，宽和高必须大于 0。")] [SerializeField]
+        [Tooltip("设计内容时使用的参考分辨率，宽和高必须大于 0。")]
+        [SerializeField]
         private Vector2 m_ReferenceResolution =
             new(CameraScalerMath.DefaultReferenceWidth, CameraScalerMath.DefaultReferenceHeight);
 
-        [Tooltip("屏幕宽高比变化时采用的相机适配策略。")] [SerializeField]
+        [Tooltip("屏幕宽高比变化时采用的相机适配策略。")]
+        [SerializeField]
         private ScaleMode m_ScaleMode = ScaleMode.ConstantWidth;
 
-        [Tooltip("宽度匹配和高度匹配之间的插值权重：0 为宽度，1 为高度。")] [Range(0f, 1f)] [SerializeField]
+        [Tooltip("宽度匹配和高度匹配之间的插值权重：0 为宽度，1 为高度。")]
+        [Range(0f, 1f)]
+        [SerializeField]
         private float m_MatchWidthOrHeight = 0.5f;
 
-        [Tooltip("参考分辨率下的正交相机垂直半尺寸。运行时以此为基准，而不是 Camera 上的当前 Size。")] [SerializeField]
+        [Tooltip("参考分辨率下的正交相机垂直半尺寸。运行时以此为基准，而不是 Camera 上的当前 Size。")]
+        [SerializeField]
         private float m_ReferenceOrthographicSize = CameraScalerMath.DefaultOrthographicSize;
 
-        [Tooltip("参考分辨率下的透视相机垂直视野角。运行时以此为基准，而不是 Camera 上的当前 FOV。")] [Range(1f, 179f)] [SerializeField]
+        [Tooltip("参考分辨率下的透视相机垂直视野角。运行时以此为基准，而不是 Camera 上的当前 FOV。")]
+        [Range(1f, 179f)]
+        [SerializeField]
         private float m_ReferenceFieldOfView = CameraScalerMath.DefaultFieldOfView;
 
-        [Tooltip("相对于基准投影视野的缩放倍率。1 表示原始视野，大于 1 表示放大。")] [Min(0.0001f)] [SerializeField]
+        [Tooltip("相对于基准投影视野的缩放倍率。1 表示原始视野，大于 1 表示放大。")]
+        [Min(0.0001f)]
+        [SerializeField]
         private float m_CameraZoom = 1f;
 
-        [Tooltip("将适配结果写入 Camera 的时机。与 Cinemachine 等系统冲突时，可改为 Late Update 或 On Pre Cull。")] [SerializeField]
+        [Tooltip("将适配结果写入 Camera 的时机。与 Cinemachine 等系统冲突时，可改为 Late Update 或 On Pre Cull。")]
+        [SerializeField]
         private ApplyTiming m_ApplyTiming = ApplyTiming.Update;
 
         // 原始参数只用于恢复，与用户可调整的参考 Size/FOV 分开保存。
         // 快照随组件序列化，避免场景/Prefab 重载后把适配结果再次作为原始值。
-        [SerializeField, HideInInspector] private bool m_HasOriginalProjection;
+        [SerializeField, HideInInspector]
+        private bool m_HasOriginalProjection;
 
-        [SerializeField, HideInInspector] private float m_OriginalSize;
+        [SerializeField, HideInInspector]
+        private float m_OriginalSize;
 
-        [SerializeField, HideInInspector] private float m_OriginalFov;
+        [SerializeField, HideInInspector]
+        private float m_OriginalFov;
 
-        [SerializeField, HideInInspector] private int m_SerializedVersion;
+        [SerializeField, HideInInspector]
+        private int m_SerializedVersion;
 
         private Camera m_Camera;
         private float m_TargetAspect;
         private float m_HorizontalFov;
         private bool m_IsInitialized;
         private bool m_HasApplied;
-        
+
         // 缓存的是当前投影类型的最终结果：正交为垂直半尺寸，透视为垂直视野角（度）。
         private float m_AppliedProjection;
 
@@ -519,14 +533,14 @@ namespace ZStudio.UniKit {
                 return;
             }
 
-            m_ReferenceOrthographicSize = 
-                CameraScalerMath.SanitizeOrthographicSize(m_HasOriginalProjection 
+            m_ReferenceOrthographicSize =
+                CameraScalerMath.SanitizeOrthographicSize(m_HasOriginalProjection
                     ? m_OriginalSize
                     : m_Camera.orthographicSize);
-            
+
             m_ReferenceFieldOfView =
                 CameraScalerMath.SanitizeFieldOfView(m_HasOriginalProjection ? m_OriginalFov : m_Camera.fieldOfView);
-            
+
             MarkBaselineSerialized();
         }
 

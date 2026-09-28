@@ -8,11 +8,20 @@ using UnityEngine;
 namespace ZStudio.UniKit.Editor {
     /// <summary>参数与预览共用切割结果；更改参数后重算，手动排除只影响当前方案。</summary>
     internal sealed class TextureSlicerWindow : EditorWindow {
-        [SerializeField] private Texture2D m_Source;
-        [SerializeField] private TextureSliceOptions m_Options = new();
-        [SerializeField] private bool m_ExportSprite = true;
-        [SerializeField] private bool m_Manifest = true;
-        [SerializeField] private string m_Prefix = "";
+        [SerializeField]
+        private Texture2D m_Source;
+
+        [SerializeField]
+        private TextureSliceOptions m_Options = new();
+
+        [SerializeField]
+        private bool m_ExportSprite = true;
+
+        [SerializeField]
+        private bool m_Manifest = true;
+
+        [SerializeField]
+        private string m_Prefix = "";
 
         private Texture2D m_Readable;
         private Color32[] m_Pixels;
@@ -108,7 +117,7 @@ namespace ZStudio.UniKit.Editor {
                 m_Tiles = null;
                 m_Error = null;
                 m_Result = null;
-                
+
                 var nextProgressUpdate = 0.0;
                 m_Tiles = TextureSliceLayout.Build(m_Readable.width, m_Readable.height, m_Pixels, m_Options,
                     value => {
@@ -146,7 +155,7 @@ namespace ZStudio.UniKit.Editor {
 
                 // 仅在 Layout 切换按钮可见性，避免点击后立即增减 GUILayout 控件。
                 m_ShowRestoreSelection = !m_ReadDirty && !m_LayoutDirty && m_Tiles != null &&
-                    m_Tiles.Any(tile => !tile.Included && (!tile.Empty || !m_Options.SkipEmpty));
+                                         m_Tiles.Any(tile => !tile.Included && (!tile.Empty || !m_Options.SkipEmpty));
             }
 
             using (new EditorGUILayout.HorizontalScope()) {
@@ -303,13 +312,13 @@ namespace ZStudio.UniKit.Editor {
                         : $"共 {m_Tiles.Count} 块 · 将导出 {m_Tiles.Count(tile => tile.Included)} 块 · 点击切片可排除／恢复",
                 EditorStyles.miniLabel);
             EditorGUILayout.LabelField("蓝框：原始切片　绿框：裁剪后区域　暗色：不导出", EditorStyles.miniLabel);
-            
+
             var viewport =
                 GUILayoutUtility.GetRect(100, 100, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
             var scale = m_Fit ? Mathf.Min((viewport.width - 20) / m_Readable.width,
                 (viewport.height - 20) / m_Readable.height) : m_Zoom;
             scale = Mathf.Max(0.001f, scale);
-            
+
             var imageRect = new Rect(0, 0, m_Readable.width * scale, m_Readable.height * scale);
             var content = new Rect(0, 0, Mathf.Max(viewport.width - 18, imageRect.width),
                 Mathf.Max(viewport.height - 18, imageRect.height));

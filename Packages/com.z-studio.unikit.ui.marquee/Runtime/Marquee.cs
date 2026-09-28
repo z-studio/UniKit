@@ -15,29 +15,36 @@ namespace ZStudio.UniKit.UI {
         [Tooltip("内容样式模板：可包含 Image 或 Text；扩展片段使用各自的渲染器")]
         public RectTransform ContentTemplate;
 
-        [Tooltip("跑马灯条目：可混排文本、图片与扩展片段")] public List<MarqueeItemData> Items = new();
+        [Tooltip("跑马灯条目：可混排文本、图片与扩展片段")]
+        public List<MarqueeItemData> Items = new();
 
         [Tooltip("滚动模式：Sequential 逐条轮播；Continuous 无缝连续滚动")]
         public MarqueeScrollMode ScrollMode = MarqueeScrollMode.Sequential;
 
-        [Tooltip("滚动方向")] public MarqueeDirection Direction = MarqueeDirection.Left;
+        [Tooltip("滚动方向")]
+        public MarqueeDirection Direction = MarqueeDirection.Left;
 
         [Tooltip("循环 或 单次（仅 Sequential 模式生效）")]
         public MarqueePlayMode PlayMode = MarqueePlayMode.Loop;
 
-        [Tooltip("内容边缘与可视区域边缘的距离（仅在内容超出可视区域时有效）")] [Min(0f)]
+        [Tooltip("内容边缘与可视区域边缘的距离（仅在内容超出可视区域时有效）")]
+        [Min(0f)]
         public float EdgeMargin = 10f;
 
         [Tooltip("内容尺寸未超过视口时是否居中显示（仅 Sequential 模式）")]
         public bool CenterWhenFit = true;
 
-        [Tooltip("内容未超过视口时的展示时长（秒），仅当 centerWhenFit 启用时生效")] [Min(0.1f)]
+        [Tooltip("内容未超过视口时的展示时长（秒），仅当 centerWhenFit 启用时生效")]
+        [Min(0.1f)]
         public float DisplayDurationWhenFit = 3f;
 
-        [Tooltip("内容超过视口时，开始滚动前的停留时长（秒）")] [Min(0f)]
+        [Tooltip("内容超过视口时，开始滚动前的停留时长（秒）")]
+        [Min(0f)]
         public float DisplayDurationBeforeScroll = 1f;
 
-        [Tooltip("滚动速度：每秒移动的像素数")] [Min(1f)] public float ScrollSpeed = 100f;
+        [Tooltip("滚动速度：每秒移动的像素数")]
+        [Min(1f)]
+        public float ScrollSpeed = 100f;
 
         [Tooltip("滚动缓动（仅 Sequential 模式生效；Continuous 为保证无缝始终匀速）")]
         public MarqueeEase Ease = MarqueeEase.Linear;
@@ -45,15 +52,19 @@ namespace ZStudio.UniKit.UI {
         [Tooltip("自定义缓动曲线（ease == Custom 时生效）：横轴 0→1 为进度，纵轴 0→1 为位移比例")]
         public AnimationCurve CustomCurve = AnimationCurve.Linear(0f, 0f, 1f, 1f);
 
-        [Tooltip("无缝连续滚动模式下，相邻条目之间的间距（像素）")] [Min(0f)]
+        [Tooltip("无缝连续滚动模式下，相邻条目之间的间距（像素）")]
+        [Min(0f)]
         public float Spacing = 40f;
 
-        [Tooltip("同一条目内，相邻片段（文本/图片/spine）之间的间距（像素）")] [Min(0f)]
+        [Tooltip("同一条目内，相邻片段（文本/图片/spine）之间的间距（像素）")]
+        [Min(0f)]
         public float SegmentSpacing = 4f;
 
-        [Tooltip("是否在 Start 时自动开始播放")] public bool PlayOnStart = true;
+        [Tooltip("是否在 Start 时自动开始播放")]
+        public bool PlayOnStart = true;
 
-        [Tooltip("是否忽略 Time.timeScale 的影响")] public bool IgnoreTimeScale = false;
+        [Tooltip("是否忽略 Time.timeScale 的影响")]
+        public bool IgnoreTimeScale = false;
 
         // ---- 事件回调 ----
         /// <summary>开始展示某条目时触发（item, index）。Continuous 模式下不触发。</summary>
@@ -759,7 +770,7 @@ namespace ZStudio.UniKit.UI {
             foreach (var placement in m_Placements) {
                 if (!m_VisibleUnits.TryGetValue(placement.Occurrence, out var unit)) {
                     unit = m_Content.AcquireUnit();
-                    
+
                     // 先登记所有权，再调用扩展代码；失败由播放会话统一清理。
                     unit.Occurrence = placement.Occurrence;
                     m_ActiveUnits.Add(unit);

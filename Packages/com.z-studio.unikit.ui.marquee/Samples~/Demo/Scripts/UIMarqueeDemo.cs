@@ -23,14 +23,18 @@ namespace ZStudio.UniKit.UI.Samples {
     /// 所有屏幕文本使用英文，以保证任何默认字体下都能正确显示（不依赖中文字体）。
     /// </summary>
     public class UIMarqueeDemo : MonoBehaviour {
-        [Tooltip("逐条/无缝滚动速度（像素/秒）")] public float ScrollSpeed = 120f;
+        [Tooltip("逐条/无缝滚动速度（像素/秒）")] 
+        public float ScrollSpeed = 120f;
 
-        [Tooltip("无缝模式相邻条目间距")] public float Spacing = 60f;
+        [Tooltip("无缝模式相邻条目间距")] 
+        public float Spacing = 60f;
 
-        [Tooltip("Sequential 跑马灯。留空则运行时自动创建；也可用右键菜单「Create Demo Marquees In Scene」在编辑器预先生成后自定义配置。")] [SerializeField]
+        [Tooltip("Sequential 跑马灯。留空则运行时自动创建；也可用右键菜单「Create Demo Marquees In Scene」在编辑器预先生成后自定义配置。")] 
+        [SerializeField]
         private Marquee m_Sequential;
 
-        [Tooltip("Continuous 跑马灯。留空则运行时自动创建；也可用右键菜单预先生成。")] [SerializeField]
+        [Tooltip("Continuous 跑马灯。留空则运行时自动创建；也可用右键菜单预先生成。")] 
+        [SerializeField]
         private Marquee m_Continuous;
 
         private Sprite m_DemoSprite;

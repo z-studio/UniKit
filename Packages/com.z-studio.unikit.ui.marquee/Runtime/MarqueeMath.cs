@@ -106,14 +106,8 @@ namespace ZStudio.UniKit.UI {
         /// 计算逐条滚动模式下，内容（anchor/pivot 居中）的起止 anchoredPosition。
         /// 起点：内容贴“流出边”内侧 margin 处（初始即可见）；终点：内容完全移出“流出边”。
         /// </summary>
-        public static void ComputeScrollPositions(
-            MarqueeDirection dir,
-            Vector2 viewportSize,
-            Vector2 contentSize,
-            float margin,
-            out Vector2 start,
-            out Vector2 end
-        ) {
+        public static void ComputeScrollPositions(MarqueeDirection dir, Vector2 viewportSize, Vector2 contentSize,
+            float margin, out Vector2 start, out Vector2 end) {
             float vp = AxisSize(dir, viewportSize);
             float content = AxisSize(dir, contentSize);
             float f = FlowSign(dir);
@@ -342,7 +336,8 @@ namespace ZStudio.UniKit.UI {
         /// <summary>
         /// 无缝环形复用：单元是否已沿流向完全滚出视口的“流出边”（其整体越过 +f 侧边界），应绕回入场端复用。
         /// </summary>
-        public static bool ContinuousUnitFullyExited(MarqueeDirection dir, float center, float axisSize, float viewportAxis) {
+        public static bool ContinuousUnitFullyExited(MarqueeDirection dir, float center, float axisSize,
+            float viewportAxis) {
             float f = FlowSign(dir);
             return f * center > viewportAxis * 0.5f + axisSize * 0.5f;
         }
