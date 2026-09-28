@@ -6,22 +6,29 @@ namespace ZStudio.UniKit.UI.Spine {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(SkeletonGraphic))]
     public sealed class BannerSpinePage : BannerPageBehaviour {
-        [SerializeField] private SkeletonGraphic m_Skeleton;
+        [SerializeField]
+        private SkeletonGraphic m_Skeleton;
 
-        [Tooltip("留空时使用 SkeletonGraphic 的 Starting Animation。")] [SpineAnimation, SerializeField]
+        [Tooltip("留空时使用 SkeletonGraphic 的 Starting Animation。")]
+        [SpineAnimation, SerializeField]
         private string m_Animation;
 
-        [SerializeField] private bool m_Loop = true;
+        [SerializeField]
+        private bool m_Loop = true;
 
-        [Tooltip("再次进入页面时从头播放；关闭后保留已有动画的播放进度。")] [SerializeField]
+        [Tooltip("再次进入页面时从头播放；关闭后保留已有动画的播放进度。")]
+        [SerializeField]
         private bool m_RestartOnSelection = true;
 
-        [Tooltip("进入过程中保持姿势，页面停稳并选中后再开始播放。")] [SerializeField]
+        [Tooltip("进入过程中保持姿势，页面停稳并选中后再开始播放。")]
+        [SerializeField]
         private bool m_WaitUntilSelected = true;
 
-        [SerializeField, Min(0f)] private float m_TimeScale = 1f;
+        [SerializeField, Min(0f)]
+        private float m_TimeScale = 1f;
 
-        [SerializeField] private bool m_UnscaledTime = true;
+        [SerializeField]
+        private bool m_UnscaledTime = true;
 
         // 区分首次播放与再次进入，使“继续播放”模式仍能在首次显示时建立动画轨道。
         private bool m_HasPlayed;

@@ -3,7 +3,9 @@
     "rootNamespace": "ZStudio.UniKit.UI",
     "references": [
         "ZStudio.UniKit.UI.BannerCarousel",
-        "UnityEngine.UI"
+        "UnityEngine.UI",
+        "Unity.InputSystem",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

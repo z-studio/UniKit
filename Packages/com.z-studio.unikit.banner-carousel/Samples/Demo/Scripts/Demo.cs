@@ -1,31 +1,66 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
 namespace ZStudio.UniKit.UI.Samples {
     /// <summary>完整演示场景的控制器；界面控件的事件绑定已保存在场景中，运行时直接使用。</summary>
     public sealed class Demo : MonoBehaviour {
-        [Header("演示内容")] [SerializeField] private BannerCarousel m_Carousel;
-        [SerializeField] private BannerCarouselIndicators m_Indicators;
-        [SerializeField] private Sprite[] m_Images;
-        [SerializeField] private RectTransform m_SpinePage;
-        [SerializeField] private RectTransform m_MixedPage;
-        [SerializeField] private Button m_BarIndicator;
-        [SerializeField] private GameObject m_EditModePreview;
+        [Header("演示内容")]
+        [SerializeField]
+        private BannerCarousel m_Carousel;
 
-        [Header("实时反馈")] [SerializeField]
-        private Text m_PageLabel;
+        [SerializeField]
+        private BannerCarouselIndicators m_Indicators;
 
-        [SerializeField] private Text m_StateLabel;
-        [SerializeField] private Text m_EventLog;
-        [SerializeField] private Text m_DwellLabel;
-        [SerializeField] private Text m_TransitionLabel;
-        [SerializeField] private Text m_PauseLabel;
-        [SerializeField] private Image m_Progress;
-        [SerializeField] private GameObject m_EmptyMessage;
-        [SerializeField] private Button m_Previous;
-        [SerializeField] private Button m_Next;
-        [SerializeField] private Toggle m_AutoPlay;
+        [SerializeField]
+        private Sprite[] m_Images;
+
+        [SerializeField]
+        private RectTransform m_SpinePage;
+
+        [SerializeField]
+        private RectTransform m_MixedPage;
+
+        [SerializeField]
+        private Button m_BarIndicator;
+
+        [SerializeField]
+        private GameObject m_EditModePreview;
+
+        [Header("实时反馈")]
+        [SerializeField]
+        private TextMeshProUGUI m_PageLabel;
+
+        [SerializeField]
+        private TextMeshProUGUI m_StateLabel;
+
+        [SerializeField]
+        private TextMeshProUGUI m_EventLog;
+
+        [SerializeField]
+        private TextMeshProUGUI m_DwellLabel;
+
+        [SerializeField]
+        private TextMeshProUGUI m_TransitionLabel;
+
+        [SerializeField]
+        private TextMeshProUGUI m_PauseLabel;
+
+        [SerializeField]
+        private Image m_Progress;
+
+        [SerializeField]
+        private GameObject m_EmptyMessage;
+
+        [SerializeField]
+        private Button m_Previous;
+
+        [SerializeField]
+        private Button m_Next;
+
+        [SerializeField]
+        private Toggle m_AutoPlay;
 
         // 只展示最近三条事件；页面名称列表与当前内容集合的索引保持一致。
         private readonly Queue<string> m_Events = new();
@@ -37,7 +72,7 @@ namespace ZStudio.UniKit.UI.Samples {
 
         private void Awake() {
             m_OriginalTimeScale = Time.timeScale;
-            
+
             // 编辑模式预览不参与运行时轮播，避免与轮播生成的实例重叠。
             m_EditModePreview.SetActive(false);
         }
@@ -54,7 +89,7 @@ namespace ZStudio.UniKit.UI.Samples {
             m_Carousel.OnBannerChanged.RemoveListener(Selected);
             m_Carousel.OnBannerClicked.RemoveListener(Clicked);
             m_Carousel.OnPlaybackCompleted.RemoveListener(Completed);
-            
+
             // 退出演示时撤销“冻结游戏时间”，避免影响之后运行的场景或其他逻辑。
             Time.timeScale = m_OriginalTimeScale;
         }
@@ -138,14 +173,17 @@ namespace ZStudio.UniKit.UI.Samples {
         }
 
         public void TogglePause() {
-            if (m_Carousel.IsPaused) m_Carousel.Resume();
-            else m_Carousel.Pause();
+            if (m_Carousel.IsPaused) {
+                m_Carousel.Resume();
+            } else {
+                m_Carousel.Pause();
+            }
         }
 
         public void Restart() {
             m_Carousel.GoTo(0, false);
             m_Carousel.Play();
-            
+
             // 只同步开关外观，不再次触发控件回调；Play 已负责恢复自动播放。
             m_AutoPlay.SetIsOnWithoutNotify(true);
             Record("Restarted from first page");

@@ -15,24 +15,46 @@ namespace ZStudio.UniKit.UI {
             Progress
         }
 
-        [SerializeField] private BannerCarousel m_Carousel;
+        [SerializeField]
+        private BannerCarousel m_Carousel;
 
-        [Tooltip("指示器专用容器，应放在轮播视口之外。留空时使用当前物体。")] [SerializeField]
+        [Tooltip("指示器专用容器，应放在轮播视口之外。留空时使用当前物体。")]
+        [SerializeField]
         private RectTransform m_Container;
 
-        [Tooltip("可选按钮模板。Target Graphic 必须为 Image；进度样式需指定非空 Sprite，并将 Image 类型设为 Filled。")] [SerializeField]
+        [Tooltip("可选按钮模板。Target Graphic 必须为 Image；进度样式需指定非空 Sprite，并将 Image 类型设为 Filled。")]
+        [SerializeField]
         private Button m_Template;
 
-        [SerializeField] private IndicatorStyle m_Style;
-        [SerializeField] private bool m_Visible = true;
-        [SerializeField] private bool m_HideForSinglePage = true;
-        [SerializeField] private bool m_Clickable = true;
-        [SerializeField] private bool m_AutomaticLayout = true;
-        [SerializeField] private Vector2 m_Size = new(12f, 12f);
-        [SerializeField, Min(0f)] private float m_Spacing = 8f;
-        [SerializeField] private Color m_NormalColor = new(1f, 1f, 1f, 0.4f);
-        [SerializeField] private Color m_SelectedColor = Color.white;
-        [SerializeField, Min(0.1f)] private float m_SelectedScale = 1.2f;
+        [SerializeField]
+        private IndicatorStyle m_Style;
+
+        [SerializeField]
+        private bool m_Visible = true;
+
+        [SerializeField]
+        private bool m_HideForSinglePage = true;
+
+        [SerializeField]
+        private bool m_Clickable = true;
+
+        [SerializeField]
+        private bool m_AutomaticLayout = true;
+
+        [SerializeField]
+        private Vector2 m_Size = new(12f, 12f);
+
+        [SerializeField, Min(0f)]
+        private float m_Spacing = 8f;
+
+        [SerializeField]
+        private Color m_NormalColor = new(1f, 1f, 1f, 0.4f);
+
+        [SerializeField]
+        private Color m_SelectedColor = Color.white;
+
+        [SerializeField, Min(0.1f)]
+        private float m_SelectedScale = 1.2f;
 
         // 两个列表按页面索引一一对应，只缓存本组件生成的按钮及其目标图像。
         private readonly List<Button> m_Buttons = new();
@@ -99,9 +121,10 @@ namespace ZStudio.UniKit.UI {
             }
         }
 
-        private bool ShouldShow => isActiveAndEnabled && m_Visible && m_Carousel != null
-                                   && m_Carousel.ShowIndicators
-                                   && (!m_HideForSinglePage || m_Carousel.Count > 1);
+        private bool ShouldShow =>
+            isActiveAndEnabled && m_Visible && m_Carousel != null
+            && m_Carousel.ShowIndicators
+            && (!m_HideForSinglePage || m_Carousel.Count > 1);
 
         private void OnEnable() => RefreshVisibility();
 

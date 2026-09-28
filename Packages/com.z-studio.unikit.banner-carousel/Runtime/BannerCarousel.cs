@@ -79,8 +79,8 @@ namespace ZStudio.UniKit.UI {
         [SerializeField]
         private bool m_ShowIndicators = true;
 
-        [Header("事件")]
         /// <summary>非拖拽的页面点击事件，参数为当前有效页面索引。</summary>
+        [Header("事件")]
         public UnityEvent<int> OnBannerClicked = new();
 
         [Tooltip("初始选中及每次自动或手动切换完成后触发。")]
@@ -318,7 +318,9 @@ namespace ZStudio.UniKit.UI {
 
             if (m_Pages != null && m_Pages.Length > 0) {
                 foreach (var page in m_Pages) {
-                    if (page != null && (page.Prefab != null || page.Sprite != null)) m_Items.Add(page);
+                    if (page != null && (page.Prefab != null || page.Sprite != null)) {
+                        m_Items.Add(page);
+                    }
                 }
             }
 
@@ -412,7 +414,9 @@ namespace ZStudio.UniKit.UI {
             BeginMotion(direction, false);
         }
 
-        // direction 为 +1 或 -1；循环模式映射首尾，其他模式越界时返回 -1。
+        /// <summary>
+        /// direction 为 +1 或 -1；循环模式映射首尾，其他模式越界时返回 -1。
+        /// </summary>
         private int Neighbour(int direction) {
             if (Count <= 1) {
                 return -1;
@@ -444,8 +448,7 @@ namespace ZStudio.UniKit.UI {
                 if (t >= 1f) {
                     FinishMotion();
                 }
-            }
-            else if (!m_IsDragging && IsPlaying) {
+            } else if (!m_IsDragging && IsPlaying) {
                 m_DwellTime += delta;
 
                 if (m_DwellTime >= CurrentDuration) {
@@ -497,13 +500,14 @@ namespace ZStudio.UniKit.UI {
 
             if (immediate || m_SlideDuration <= 0f || (!m_DragTransition && m_Transition == BannerTransition.Instant)) {
                 FinishMotion();
-            }
-            else {
+            } else {
                 RenderMotion(m_Offset);
             }
         }
 
-        // 滑动时两页保持一页间距；淡入淡出时重叠显示。拖拽及回弹始终使用滑动。
+        /// <summary>
+        /// 滑动时两页保持一页间距；淡入淡出时重叠显示。拖拽及回弹始终使用滑动。
+        /// </summary>
         private void RenderMotion(float offset) {
             m_Offset = offset;
             bool fade = !m_DragTransition && m_Transition == BannerTransition.CrossFade && !m_SnapBack;
@@ -528,8 +532,7 @@ namespace ZStudio.UniKit.UI {
                 m_Current = m_Incoming;
                 CurrentIndex = m_TargetIndex;
                 m_Incoming = null;
-            }
-            else {
+            } else {
                 Hide(m_Incoming);
                 m_Incoming = null;
             }
@@ -549,7 +552,9 @@ namespace ZStudio.UniKit.UI {
             }
         }
 
-        // 中断时以已提交的当前页为准，丢弃候选页，不发送切换完成事件。
+        /// <summary>
+        /// 中断时以已提交的当前页为准，丢弃候选页，不发送切换完成事件。
+        /// </summary>
         private void CancelMotion() {
             m_IsDragging = false;
             m_IsAnimating = false;
@@ -610,8 +615,7 @@ namespace ZStudio.UniKit.UI {
             if (target >= 0) {
                 m_IncomingDirection = direction;
                 PrepareIncoming(target, direction);
-            }
-            else {
+            } else {
                 Hide(m_Incoming);
                 m_Incoming = null;
             }
@@ -634,13 +638,12 @@ namespace ZStudio.UniKit.UI {
             // 仅认可最近 0.1 秒内且与位移同向的速度，避免停住后松手仍被当成轻扫。
             bool flick = m_FlickVelocity > 0f && Time.unscaledTime - m_LastDragTime < 0.1f
                                               && Mathf.Abs(m_Velocity) >= m_FlickVelocity
-                                              && Mathf.Sign(m_Velocity) == Mathf.Sign(distance);
+                                              && Mathf.Approximately(Mathf.Sign(m_Velocity), Mathf.Sign(distance));
 
             if (m_Incoming != null && (Mathf.Abs(distance) >= Mathf.Min(m_DragThreshold, PageSize * 0.5f) || flick)) {
                 m_Completed = false;
                 BeginMotion(m_IncomingDirection, false);
-            }
-            else {
+            } else {
                 m_SnapBack = true;
                 m_AnimationFrom = m_Offset;
                 m_AnimationTo = 0f;
@@ -653,7 +656,9 @@ namespace ZStudio.UniKit.UI {
             }
         }
 
-        // 将屏幕坐标转到视口本地空间，让拖拽阈值和位移不受 Canvas 缩放影响。
+        /// <summary>
+        /// 将屏幕坐标转到视口本地空间，让拖拽阈值和位移不受 Canvas 缩放影响。
+        /// </summary>
         private bool LocalPoint(PointerEventData data, out Vector2 point) =>
             RectTransformUtility.ScreenPointToLocalPointInRectangle(m_Viewport, data.position, data.pressEventCamera,
                 out point);
@@ -676,6 +681,7 @@ namespace ZStudio.UniKit.UI {
             var page = m_Items[index];
             var root = new GameObject($"Page {index}", typeof(RectTransform), typeof(CanvasGroup), typeof(Image));
             root.SetActive(false);
+            
             var rt = (RectTransform)root.transform;
             rt.SetParent(m_PageRoot, false);
             Stretch(rt);
@@ -687,8 +693,7 @@ namespace ZStudio.UniKit.UI {
                 var content = Instantiate(page.Prefab, rt, false);
                 Stretch(content);
                 content.gameObject.SetActive(true);
-            }
-            else {
+            } else {
                 var content = new GameObject("Image", typeof(RectTransform), typeof(Image));
                 content.transform.SetParent(rt, false);
                 Stretch((RectTransform)content.transform);
@@ -709,7 +714,9 @@ namespace ZStudio.UniKit.UI {
             return view;
         }
 
-        // 只规范页面根节点，内容的具体位置和缩放由预制体子节点自行配置。
+        /// <summary>
+        /// 只规范页面根节点，内容的具体位置和缩放由预制体子节点自行配置。
+        /// </summary>
         private static void Stretch(RectTransform rect) {
             rect.anchorMin = Vector2.zero;
             rect.anchorMax = Vector2.one;
@@ -720,7 +727,9 @@ namespace ZStudio.UniKit.UI {
             rect.localRotation = Quaternion.identity;
         }
 
-        // 预览阶段只显示页面，等正式选中后再允许页内控件接收点击。
+        /// <summary>
+        /// 预览阶段只显示页面，等正式选中后再允许页内控件接收点击。
+        /// </summary>
         private static void Show(PageView view) {
             if (view == null || view.Root.gameObject.activeSelf) {
                 return;
@@ -747,7 +756,9 @@ namespace ZStudio.UniKit.UI {
             }
         }
 
-        // 先通知页面清理或暂停演出，再停用节点；缓存实例仍保留供后续复用。
+        /// <summary>
+        /// 先通知页面清理或暂停演出，再停用节点；缓存实例仍保留供后续复用。
+        /// </summary>
         private static void Hide(PageView view) {
             if (view == null || view.Root == null || !view.Root.gameObject.activeSelf) {
                 return;
@@ -765,8 +776,7 @@ namespace ZStudio.UniKit.UI {
         private static void DestroyOwned(GameObject target) {
             if (Application.isPlaying) {
                 Destroy(target);
-            }
-            else {
+            } else {
                 DestroyImmediate(target);
             }
         }
