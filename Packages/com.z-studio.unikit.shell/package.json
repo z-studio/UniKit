@@ -1,0 +1,19 @@
+{
+  "name": "com.z-studio.unikit.shell",
+  "displayName": "Shell",
+  "description": "Run shell in unity editor",
+  "version": "1.0.0",
+  "author": {
+    "name": "Z Studio"
+  },
+  "keywords": [
+    "shell",
+    "batch",
+    "bash",
+    "command",
+    "cmd",
+    "system",
+    "colorlog"
+  ],
+  "unity": "6000.0"
+}
