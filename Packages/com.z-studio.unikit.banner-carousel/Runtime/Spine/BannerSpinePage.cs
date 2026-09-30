@@ -33,6 +33,39 @@ namespace ZStudio.UniKit.UI.Spine {
         // 记录已播放的动画状态；骨骼重建后状态实例变化，需要重新建立动画轨道。
         private global::Spine.AnimationState m_PlayedState;
 
+        /// <summary>按当前轨道进度和速度计算剩余时间；循环动画取当前这一轮的剩余时间。</summary>
+        public override bool TryGetRemainingDuration(bool useUnscaledTime, out float duration) {
+            duration = 0f;
+
+            if (m_Skeleton == null || !m_Skeleton.isActiveAndEnabled || m_Skeleton.freeze) {
+                return false;
+            }
+
+            var state = m_Skeleton.AnimationState;
+            var track = state?.GetCurrent(0);
+
+            if (track == null) {
+                return false;
+            }
+
+            float speed = m_Skeleton.timeScale * state.TimeScale * track.TimeScale;
+
+            if (m_Skeleton.UnscaledTime != useUnscaledTime) {
+                if (Time.timeScale <= 0f) {
+                    return false;
+                }
+
+                speed *= m_Skeleton.UnscaledTime ? 1f / Time.timeScale : Time.timeScale;
+            }
+
+            if (speed <= 0f || float.IsNaN(speed) || float.IsInfinity(speed)) {
+                return false;
+            }
+
+            duration = Mathf.Max(0f, track.TrackComplete - track.TrackTime) / speed;
+            return !float.IsNaN(duration) && !float.IsInfinity(duration);
+        }
+
         /// <summary>初始化骨骼，并按配置准备进入期间的姿势与播放状态。</summary>
         public override void OnPageShown() {
             if (m_Skeleton == null) {
