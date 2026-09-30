@@ -30,8 +30,8 @@ namespace ZStudio.UniKit.UI.Spine {
         [SerializeField]
         private bool m_UnscaledTime = true;
 
-        // 区分首次播放与再次进入，使“继续播放”模式仍能在首次显示时建立动画轨道。
-        private bool m_HasPlayed;
+        // 记录已播放的动画状态；骨骼重建后状态实例变化，需要重新建立动画轨道。
+        private global::Spine.AnimationState m_PlayedState;
 
         /// <summary>初始化骨骼，并按配置准备进入期间的姿势与播放状态。</summary>
         public override void OnPageShown() {
@@ -43,14 +43,8 @@ namespace ZStudio.UniKit.UI.Spine {
             m_Skeleton.UnscaledTime = m_UnscaledTime;
             m_Skeleton.timeScale = m_WaitUntilSelected ? 0f : m_TimeScale;
 
-            if (!m_WaitUntilSelected) {
-                PlayAnimation();
-            } else if (m_RestartOnSelection && m_Skeleton.Skeleton != null) {
-                // 重播模式先清理上次动画的姿势，避免滑入时短暂显示上次退出时的画面。
-                m_Skeleton.AnimationState.ClearTracks();
-                m_Skeleton.Skeleton.SetToSetupPose();
-                m_Skeleton.Update(0f);
-            }
+            // 页面进入时就准备目标动画；等待选中只暂停时间，不能显示默认动画或 Setup Pose。
+            PlayAnimation();
         }
 
         /// <summary>页面停稳后开始演出，并恢复配置的动画速度。</summary>
@@ -59,7 +53,8 @@ namespace ZStudio.UniKit.UI.Spine {
                 return;
             }
 
-            if (m_WaitUntilSelected) {
+            // 正常进入时轨道已经准备好；仅在准备失败或期间发生重建时补建。
+            if (m_Skeleton.AnimationState != m_PlayedState) {
                 PlayAnimation();
             }
 
@@ -76,7 +71,9 @@ namespace ZStudio.UniKit.UI.Spine {
 
         // 仅在首次播放或启用重播时重新设置轨道；继续播放模式保留原轨道及其进度。
         private void PlayAnimation() {
-            if (m_Skeleton.AnimationState == null || (m_HasPlayed && !m_RestartOnSelection)) {
+            var state = m_Skeleton.AnimationState;
+
+            if (state == null || (state == m_PlayedState && !m_RestartOnSelection)) {
                 return;
             }
 
@@ -91,11 +88,16 @@ namespace ZStudio.UniKit.UI.Spine {
                 return;
             }
 
-            m_Skeleton.AnimationState.SetAnimation(0, animation, m_Loop);
+            // 首次播放和重播都清除默认动画及旧姿势；继续播放已在上方提前返回。
+            state.ClearTracks();
+            m_Skeleton.Skeleton.SetToSetupPose();
 
-            // 立即应用动画的当前姿势，不推进时间，避免等待下一帧才刷新画面。
+            state.SetAnimation(0, animation, m_Loop);
+
+            // 立即应用首帧并刷新网格，避免渲染到默认动画或上次离开时的画面。
             m_Skeleton.Update(0f);
-            m_HasPlayed = true;
+            m_Skeleton.UpdateMesh();
+            m_PlayedState = state;
         }
     }
 }
