@@ -94,6 +94,7 @@ namespace ZStudio.UniKit.UI {
             public RectTransform Root;
             public CanvasGroup Group;
             public BannerPageBehaviour[] Behaviours;
+            public float? AutomaticDuration;
         }
 
         // 过滤空配置后的有效页面；所有对外索引均以此列表为准。
@@ -185,7 +186,7 @@ namespace ZStudio.UniKit.UI {
             set => m_AutoPlay = value;
         }
 
-        /// <summary>默认停留秒数，页面自身配置了正数 Duration 时优先使用页面配置。</summary>
+        /// <summary>没有显式页面 Duration 或内容自动时长时使用的默认停留秒数。</summary>
         public float DwellDuration {
             get => m_AutoSlideInterval;
             set => m_AutoSlideInterval = Mathf.Max(0.01f, value);
@@ -231,7 +232,7 @@ namespace ZStudio.UniKit.UI {
         private float CurrentDuration =>
             CurrentIndex >= 0 && m_Items[CurrentIndex].Duration > 0f
                 ? m_Items[CurrentIndex].Duration
-                : Mathf.Max(0.01f, m_AutoSlideInterval);
+                : Mathf.Max(0.01f, m_Current?.AutomaticDuration ?? m_AutoSlideInterval);
 
         private bool IsHorizontal => m_SlideDirection is SlideDirection.LeftToRight or SlideDirection.RightToLeft;
 
@@ -746,7 +747,7 @@ namespace ZStudio.UniKit.UI {
             }
         }
 
-        private static void Select(PageView view) {
+        private void Select(PageView view) {
             view.Group.blocksRaycasts = true;
 
             foreach (var behaviour in view.Behaviours) {
@@ -754,6 +755,19 @@ namespace ZStudio.UniKit.UI {
                     behaviour.OnPageSelected();
                 }
             }
+
+            // 等所有组件恢复播放后取一次快照，避免剩余时长逐帧缩短导致提前切页。
+            view.AutomaticDuration = null;
+
+            foreach (var behaviour in view.Behaviours) {
+                if (behaviour != null && behaviour.isActiveAndEnabled
+                    && behaviour.TryGetRemainingDuration(m_UseUnscaledTime, out float duration)
+                    && duration >= 0f && !float.IsInfinity(duration)) {
+                    view.AutomaticDuration = Mathf.Max(view.AutomaticDuration ?? 0f, duration);
+                }
+            }
+
+            m_DwellTime = 0f;
         }
 
         /// <summary>

@@ -11,7 +11,7 @@ namespace ZStudio.UniKit.UI {
         [Tooltip("复合页面的预制体，根节点会拉伸到视口尺寸，具体布局应配置在子节点上。")]
         public RectTransform Prefab;
         
-        [Tooltip("单页停留秒数，不含切换时间；零表示使用轮播的默认停留时长。")] [Min(0f)]
+        [Tooltip("单页停留秒数，不含切换时间；零表示自动读取页面动画时长，无可用动画时使用轮播默认值。")] [Min(0f)]
         public float Duration;
 
         [Tooltip("图片页是否保持原始宽高比；预制体页面由自身的布局决定。")]
