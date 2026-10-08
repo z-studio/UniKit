@@ -18,12 +18,6 @@
         "com.esotericsoftware.spine.spine-csharp": "4.2.0"
       }
     },
-    "com.kyrylokuzyk.primetween": {
-      "version": "file:PrimeTween",
-      "depth": 0,
-      "source": "embedded",
-      "dependencies": {}
-    },
     "com.unity.2d.sprite": {
       "version": "1.0.0",
       "depth": 0,
