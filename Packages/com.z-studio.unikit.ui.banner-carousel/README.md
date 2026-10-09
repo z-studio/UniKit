@@ -4,15 +4,15 @@ UGUI 轮播组件，支持 Sprite、Spine 和图片＋动画＋文字＋按钮�
 
 ## 最小 UGUI 示例
 
-打开 **`Samples/Demo/Scenes/MinimalDemo.unity`** 并运行。场景中的 `MinimalDemo` 脚本创建三张图片的轮播、上一页/下一页按钮、暂停/恢复按钮和圆点指示器，可直接参考其接入代码；不需要 Spine 或 Input System。
+示例源码位于 [`Samples~/Demo`](Samples~/Demo)。在 Package Manager 中选中 **UI Banner Carousel**，导入 **Samples → Demo**，然后打开导入目录中的 **`Scenes/MinimalDemo.unity`** 并运行。
 
-该示例自动适配项目的输入配置：启用新 Input System 时使用 `InputSystemUIInputModule` 及默认 UI actions；只启用旧输入时使用 `StandaloneInputModule`；Both 模式优先使用新输入。已有可用 EventSystem 时直接复用，无需手动改项目设置或绑定输入动作。
+场景已配置轮播、上一页/下一页按钮、暂停/恢复按钮和圆点指示器。`MinimalDemo` 脚本负责设置三张图片、绑定按钮事件及更新状态文字，可直接参考其接入代码。
 
-新输入适配位于 `Samples/Demo/Scripts/InputSystem` 独立可选程序集，仅在安装并启用 Input System 时参与编译。复制示例到新输入系统项目时请保留该目录；纯 UGUI 项目不需要安装 Input System。
+示例程序集直接依赖 **Input System**，场景使用 `InputSystemUIInputModule`。导入示例前需安装 `com.unity.inputsystem`，并将项目的 **Active Input Handling** 设置为 **Input System Package (New)** 或 **Both**。最小场景不需要 Spine；核心轮播组件只依赖 UGUI，不要求安装 Input System。
 
 ## 直接体验 Demo
 
-打开 **`Samples/Demo/Scenes/Demo.unity`**，点击 Unity 的 **Play**，不需要手动添加素材或绑定引用。
+导入 Demo 后，打开导入目录中的 **`Scenes/Demo.unity`**（源码位于 [`Samples~/Demo/Scenes/Demo.unity`](Samples~/Demo/Scenes/Demo.unity)），点击 Unity 的 **Play**，不需要手动添加素材或绑定引用。
 
 场景已包含图片、原创 **Orbit Bot** Spine 4.2 骨骼动画、混合页面、导航按钮和指示器。编辑模式显示混合页预览；运行后开始轮播。
 

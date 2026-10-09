@@ -245,7 +245,7 @@
       "dependencies": {}
     },
     "com.z-studio.unikit.ui.banner-carousel": {
-      "version": "file:com.z-studio.unikit.banner-carousel",
+      "version": "file:com.z-studio.unikit.ui.banner-carousel",
       "depth": 0,
       "source": "embedded",
       "dependencies": {
