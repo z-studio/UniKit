@@ -228,14 +228,14 @@ namespace ZStudio.UniKit.Editor {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
                 EditorGUILayout.LabelField("1  Sprite 与字符映射", EditorStyles.boldLabel);
                 EditorGUI.BeginChangeCheck();
-                var source = m_SerializedSettings.FindProperty("Source");
+                var source = m_SerializedSettings.FindProperty(nameof(SpriteFontSettings.source));
                 source.enumValueIndex = EditorGUILayout.Popup("来源类型", source.enumValueIndex,
                     new[] { "Sprite 纹理（Single、Multiple）", "散图 Sprite", "SpriteAtlas" });
 
                 if ((SpriteFontSourceType)source.enumValueIndex == SpriteFontSourceType.Texture) {
-                    Field("Atlas", "Sprite 纹理", "支持 Single 和 Multiple 模式的 Sprite 纹理。");
+                    Field(nameof(SpriteFontSettings.atlas), "Sprite 纹理", "支持 Single 和 Multiple 模式的 Sprite 纹理。");
                 } else if ((SpriteFontSourceType)source.enumValueIndex == SpriteFontSourceType.SpriteAtlas) {
-                    Field("SourceAtlas", "SpriteAtlas", "读取原始 Sprite 资源，并合成字体专用图集；无需运行或 Pack Preview。");
+                    Field(nameof(SpriteFontSettings.sourceAtlas), "SpriteAtlas", "读取原始 Sprite 资源，并合成字体专用图集；无需运行或 Pack Preview。");
                 } else {
                     DrawSpriteSources();
                 }
@@ -247,7 +247,7 @@ namespace ZStudio.UniKit.Editor {
                 }
 
                 EditorGUI.BeginChangeCheck();
-                var order = m_SerializedSettings.FindProperty("Order");
+                var order = m_SerializedSettings.FindProperty(nameof(SpriteFontSettings.order));
                 order.enumValueIndex = EditorGUILayout.Popup("字符列表排序", order.enumValueIndex,
                     new[] { "来源顺序", "名称自然排序（2 在 10 前）", "按行从上到下，行内从左到右" });
 
@@ -267,7 +267,7 @@ namespace ZStudio.UniKit.Editor {
         }
 
         private void DrawSpriteSources() {
-            var sprites = m_SerializedSettings.FindProperty("SourceSprites");
+            var sprites = m_SerializedSettings.FindProperty(nameof(SpriteFontSettings.sourceSprites));
             EditorGUILayout.PropertyField(sprites, new GUIContent("Sprite 列表（展开可移除）"), true);
 
             if (GUILayout.Button("添加 Project 中选中的 Sprite / 图片 / 文件夹")) {
@@ -303,7 +303,7 @@ namespace ZStudio.UniKit.Editor {
                 return;
             }
 
-            var sprites = m_SerializedSettings.FindProperty("SourceSprites");
+            var sprites = m_SerializedSettings.FindProperty(nameof(SpriteFontSettings.sourceSprites));
             var existing = new HashSet<UnityEngine.Object>();
 
             for (var i = 0; i < sprites.arraySize; i++) {
@@ -325,19 +325,19 @@ namespace ZStudio.UniKit.Editor {
             using (new EditorGUILayout.VerticalScope(EditorStyles.helpBox)) {
                 EditorGUILayout.LabelField("2  字体与排版", EditorStyles.boldLabel);
                 
-                var output = m_SerializedSettings.FindProperty("Output");
+                var output = m_SerializedSettings.FindProperty(nameof(SpriteFontSettings.output));
                 output.enumValueIndex = EditorGUILayout.Popup("生成类型", output.enumValueIndex,
                     new[] { "UGUI Text", "TextMeshPro", "UGUI Text + TextMeshPro" });
                 
-                Field("FontSize", "设计字号", "字符最高尺寸及字体度量的基准。推荐与原始图集字符高度接近。");
-                Field("NormalizeHeight", "统一字符高度", "开启：每个切片等比缩放到设计字号。关闭：所有切片使用相同比例，保留大小差异。");
+                Field(nameof(SpriteFontSettings.fontSize), "设计字号", "字符最高尺寸及字体度量的基准。推荐与原始图集字符高度接近。");
+                Field(nameof(SpriteFontSettings.normalizeHeight), "统一字符高度", "开启：每个切片等比缩放到设计字号。关闭：所有切片使用相同比例，保留大小差异。");
                 m_ShowLayoutOptions = EditorGUILayout.Foldout(m_ShowLayoutOptions, "间距与基线", true);
 
                 if (m_ShowLayoutOptions) {
-                    Field("Baseline", "基线距底部", "0 表示字符底边位于基线上。增大后字符整体下移，适用于包含下伸部的字体。");
-                    Field("LetterSpacing", "额外字距", "每个可见字符之后额外增加的宽度，单位为设计字号下的像素，可为负。");
-                    Field("LineSpacing", "额外行距", "行高 = 设计字号 + 额外行距。");
-                    Field("SpaceWidth", "空格宽度", "空格不显示图片，只向右推进指定宽度。");
+                    Field(nameof(SpriteFontSettings.baseline), "基线距底部", "0 表示字符底边位于基线上。增大后字符整体下移，适用于包含下伸部的字体。");
+                    Field(nameof(SpriteFontSettings.letterSpacing), "额外字距", "每个可见字符之后额外增加的宽度，单位为设计字号下的像素，可为负。");
+                    Field(nameof(SpriteFontSettings.lineSpacing), "额外行距", "行高 = 设计字号 + 额外行距。");
+                    Field(nameof(SpriteFontSettings.spaceWidth), "空格宽度", "空格不显示图片，只向右推进指定宽度。");
                 }
             }
         }
@@ -374,7 +374,7 @@ namespace ZStudio.UniKit.Editor {
             }
 
             var ids = new HashSet<string>(m_Sprites.Select(sprite => sprite.spriteID.ToString()));
-            m_HasMissingSprites = m_Settings.Mappings.Any(mapping => !ids.Contains(mapping.SpriteId));
+            m_HasMissingSprites = m_Settings.mappings.Any(mapping => !ids.Contains(mapping.spriteId));
 
             try {
                 m_Entries = SpriteFontBuilder.BuildEntries(m_Settings, m_Source);
@@ -413,7 +413,7 @@ namespace ZStudio.UniKit.Editor {
                 EditorGUI.DrawTextureTransparent(area, atlas);
 
                 for (var i = 0; i < m_Entries.Count - 1; i++) {
-                    var pixels = m_Entries[i].Pixels;
+                    var pixels = m_Entries[i].pixels;
                     var rect = new Rect(area.x + pixels.x * scale,
                         area.y + (atlas.height - pixels.yMax) * scale, pixels.width * scale, pixels.height * scale);
                     GUI.Box(rect, GUIContent.none);
@@ -429,27 +429,27 @@ namespace ZStudio.UniKit.Editor {
         private void DrawTextPreview() {
             const float k_Padding = 8;
             var sample = string.IsNullOrEmpty(m_PreviewText)
-                ? string.Concat(m_Entries.Where(entry => entry.Unicode != 32)
-                    .Select(entry => char.ConvertFromUtf32((int)entry.Unicode)))
+                ? string.Concat(m_Entries.Where(entry => entry.unicode != 32)
+                    .Select(entry => char.ConvertFromUtf32((int)entry.unicode)))
                 : m_PreviewText;
             var width = m_PreviewWidth;
             var glyphs = LayoutPreview(sample, width - k_Padding * 2, out var lineCount, out var missing);
-            var lineHeight = m_Settings.FontSize + m_Settings.LineSpacing;
-            var height = m_Settings.FontSize + (lineCount - 1) * lineHeight + k_Padding * 2;
+            var lineHeight = m_Settings.fontSize + m_Settings.lineSpacing;
+            var height = m_Settings.fontSize + (lineCount - 1) * lineHeight + k_Padding * 2;
             // 使用同一宽度进行排版和绘制，避免自动换行与预览边界不一致。
             var area = GUILayoutUtility.GetRect(width, height, GUILayout.Width(width), GUILayout.Height(height));
             EditorGUI.DrawRect(area, new Color(0.13f, 0.13f, 0.13f));
             GUI.BeginClip(area);
 
             for (var line = 0; line < lineCount; line++) {
-                var baseline = k_Padding + m_Settings.FontSize - m_Settings.Baseline + line * lineHeight;
+                var baseline = k_Padding + m_Settings.fontSize - m_Settings.baseline + line * lineHeight;
                 EditorGUI.DrawRect(new Rect(0, baseline, area.width, 1), new Color(0.4f, 0.6f, 0.8f, 0.5f));
             }
 
             foreach (var glyph in glyphs) {
                 var rect = glyph.Rect;
                 rect.position += Vector2.one * k_Padding;
-                var pixels = glyph.Entry.Pixels;
+                var pixels = glyph.Entry.pixels;
                 var atlas = m_Source.Texture;
                 GUI.DrawTextureWithTexCoords(rect, atlas,
                     new Rect((float)pixels.x / atlas.width, (float)pixels.y / atlas.height,
@@ -497,17 +497,17 @@ namespace ZStudio.UniKit.Editor {
                     i++;
                 }
 
-                var index = m_Entries.FindIndex(entry => entry.Unicode == unicode);
+                var index = m_Entries.FindIndex(entry => entry.unicode == unicode);
                 var entry = index >= 0 ? m_Entries[index] : default;
-                var advance = index >= 0 ? entry.Metrics.horizontalAdvance : m_Settings.SpaceWidth;
+                var advance = index >= 0 ? entry.metrics.horizontalAdvance : m_Settings.spaceWidth;
 
                 if (c == '\t') {
-                    advance = m_Settings.SpaceWidth * 4;
+                    advance = m_Settings.spaceWidth * 4;
                 } else if (index < 0) {
                     missing = true;
                 }
 
-                var extent = Mathf.Max(advance, entry.Metrics.horizontalBearingX + entry.Metrics.width);
+                var extent = Mathf.Max(advance, entry.metrics.horizontalBearingX + entry.metrics.width);
 
                 // 宽于整行的单个字形仍绘制一次并裁切，不额外插入空行。
                 if (x > 0 && x + extent > width) {
@@ -515,11 +515,11 @@ namespace ZStudio.UniKit.Editor {
                     lineCount++;
                 }
 
-                if (index >= 0 && entry.Pixels.width > 0) {
-                    var baseline = m_Settings.FontSize - m_Settings.Baseline
-                        + (lineCount - 1) * (m_Settings.FontSize + m_Settings.LineSpacing);
-                    result.Add((entry, new Rect(x + entry.Metrics.horizontalBearingX,
-                        baseline - entry.Metrics.horizontalBearingY, entry.Metrics.width, entry.Metrics.height)));
+                if (index >= 0 && entry.pixels.width > 0) {
+                    var baseline = m_Settings.fontSize - m_Settings.baseline
+                        + (lineCount - 1) * (m_Settings.fontSize + m_Settings.lineSpacing);
+                    result.Add((entry, new Rect(x + entry.metrics.horizontalBearingX,
+                        baseline - entry.metrics.horizontalBearingY, entry.metrics.width, entry.metrics.height)));
                 }
 
                 x += advance;
@@ -530,7 +530,7 @@ namespace ZStudio.UniKit.Editor {
 
         private void DrawMapping() {
             const int k_PageSize = 8;
-            var mappings = m_SerializedSettings.FindProperty("Mappings");
+            var mappings = m_SerializedSettings.FindProperty(nameof(SpriteFontSettings.mappings));
             var pageCount = Mathf.Max(1, Mathf.CeilToInt((float)m_Sprites.Length / k_PageSize));
             m_Page = Mathf.Clamp(m_Page, 0, pageCount - 1);
             var sourceWidth = m_Source.Width;
@@ -547,7 +547,7 @@ namespace ZStudio.UniKit.Editor {
                 var mappingIndex = -1;
 
                 for (var j = 0; j < mappings.arraySize; j++) {
-                    if (mappings.GetArrayElementAtIndex(j).FindPropertyRelative("SpriteId").stringValue == id) {
+                    if (mappings.GetArrayElementAtIndex(j).FindPropertyRelative(nameof(SpriteFontCharacter.spriteId)).stringValue == id) {
                         mappingIndex = j;
                         break;
                     }
@@ -566,7 +566,7 @@ namespace ZStudio.UniKit.Editor {
 
                     EditorGUILayout.LabelField(new GUIContent(sprite.name, sprite.name), GUILayout.Height(36));
                     var character = mappingIndex < 0 ? "" : mappings.GetArrayElementAtIndex(mappingIndex)
-                        .FindPropertyRelative("Character").stringValue;
+                        .FindPropertyRelative(nameof(SpriteFontCharacter.character)).stringValue;
                     GUI.SetNextControlName("SpriteFontCharacter_" + id);
                     var edited = EditorGUILayout.TextField(character, GUILayout.Width(64), GUILayout.Height(28));
 
@@ -582,8 +582,8 @@ namespace ZStudio.UniKit.Editor {
                             }
 
                             var mapping = mappings.GetArrayElementAtIndex(mappingIndex);
-                            mapping.FindPropertyRelative("SpriteId").stringValue = id;
-                            mapping.FindPropertyRelative("Character").stringValue = edited;
+                            mapping.FindPropertyRelative(nameof(SpriteFontCharacter.spriteId)).stringValue = id;
+                            mapping.FindPropertyRelative(nameof(SpriteFontCharacter.character)).stringValue = edited;
                         }
                     }
                 }
@@ -624,7 +624,7 @@ namespace ZStudio.UniKit.Editor {
                     var ids = new HashSet<string>(m_Sprites.Select(sprite => sprite.spriteID.ToString()));
 
                     for (var i = mappings.arraySize - 1; i >= 0; i--) {
-                        if (!ids.Contains(mappings.GetArrayElementAtIndex(i).FindPropertyRelative("SpriteId").stringValue)) {
+                        if (!ids.Contains(mappings.GetArrayElementAtIndex(i).FindPropertyRelative(nameof(SpriteFontCharacter.spriteId)).stringValue)) {
                             mappings.DeleteArrayElementAtIndex(i);
                         }
                     }
@@ -650,12 +650,12 @@ namespace ZStudio.UniKit.Editor {
                 }
 
                 using (new EditorGUILayout.HorizontalScope()) {
-                    if (m_Settings.LegacyFont != null && GUILayout.Button("定位 Text 字体")) {
-                        EditorGUIUtility.PingObject(m_Settings.LegacyFont);
+                    if (m_Settings.legacyFont != null && GUILayout.Button("定位 Text 字体")) {
+                        EditorGUIUtility.PingObject(m_Settings.legacyFont);
                     }
 
-                    if (m_Settings.TMPFont != null && GUILayout.Button("定位 TMP 字体")) {
-                        EditorGUIUtility.PingObject(m_Settings.TMPFont);
+                    if (m_Settings.tmpFont != null && GUILayout.Button("定位 TMP 字体")) {
+                        EditorGUIUtility.PingObject(m_Settings.tmpFont);
                     }
                 }
             }
@@ -668,7 +668,7 @@ namespace ZStudio.UniKit.Editor {
 
                 if (!EditorUtility.IsPersistent(m_Settings)) {
                     var path = EditorUtility.SaveFilePanelInProject("保存 Sprite Font 制作配置",
-                        (m_Settings.Source == SpriteFontSourceType.Texture ? m_Settings.Atlas.name : "Sprite") + " Font", "asset", "双击此配置可以继续编辑和更新字体。");
+                        (m_Settings.source == SpriteFontSourceType.Texture ? m_Settings.atlas.name : "Sprite") + " Font", "asset", "双击此配置可以继续编辑和更新字体。");
 
                     if (string.IsNullOrEmpty(path)) {
                         return;

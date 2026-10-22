@@ -23,7 +23,7 @@ namespace ZStudio.UniKit.Editor {
         public bool IsGenerated { get; private set; }
 
         public static SpriteFontSource Load(SpriteFontSettings settings) =>
-            Load(settings.Source, settings.Atlas, settings.SourceSprites, settings.SourceAtlas, settings.Order);
+            Load(settings.source, settings.atlas, settings.sourceSprites, settings.sourceAtlas, settings.order);
 
         internal static SpriteFontSource Load(Texture2D texture) =>
             Load(SpriteFontSourceType.Texture, texture, null, null, SpriteFontOrder.Name);

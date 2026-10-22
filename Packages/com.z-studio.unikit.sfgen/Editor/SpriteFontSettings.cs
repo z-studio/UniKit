@@ -26,36 +26,33 @@ namespace ZStudio.UniKit.Editor {
 
     [Serializable]
     internal sealed class SpriteFontCharacter {
-        public string SpriteId;
-        public string Character;
+        public string spriteId;
+        public string character;
     }
 
     /// <summary>保存制作参数和输出引用；双击配置即可继续编辑，不参与运行时。</summary>
     internal sealed class SpriteFontSettings : ScriptableObject {
-        public SpriteFontSourceType Source;
-        public Texture2D Atlas;
-        public List<Sprite> SourceSprites = new();
-        public SpriteAtlas SourceAtlas;
-
-        [HideInInspector] 
-        public Texture2D GeneratedAtlas;
+        public SpriteFontSourceType source;
+        public Texture2D atlas;
+        public List<Sprite> sourceSprites = new();
+        public SpriteAtlas sourceAtlas;
 
         // 绑定 Sprite 的稳定 ID，列表排序和切片改名都不改变字符映射。
-        public List<SpriteFontCharacter> Mappings = new();
-        public SpriteFontOrder Order = SpriteFontOrder.Name;
-        public SpriteFontOutput Output = SpriteFontOutput.TextMeshPro;
-        public int FontSize = 32;
-        public bool NormalizeHeight;
-        public int Baseline;
-        public int LetterSpacing;
-        public int LineSpacing;
-        public int SpaceWidth = 16;
+        public List<SpriteFontCharacter> mappings = new();
+        public SpriteFontOrder order = SpriteFontOrder.Name;
+        public SpriteFontOutput output = SpriteFontOutput.TextMeshPro;
+        public int fontSize = 32;
+        public bool normalizeHeight;
+        public int baseline;
+        public int letterSpacing;
+        public int lineSpacing;
+        public int spaceWidth = 16;
 
         [HideInInspector]
-        public Font LegacyFont;
+        public Font legacyFont;
 
         [HideInInspector]
-        public TMP_FontAsset TMPFont;
+        public TMP_FontAsset tmpFont;
     }
 
     [CustomEditor(typeof(SpriteFontSettings))]
@@ -69,11 +66,13 @@ namespace ZStudio.UniKit.Editor {
             }
 
             using (new EditorGUI.DisabledScope(true)) {
-                EditorGUILayout.EnumPopup("来源类型", settings.Source);
-                EditorGUILayout.ObjectField("字体纹理", settings.Source == SpriteFontSourceType.Texture
-                    ? settings.Atlas : settings.GeneratedAtlas, typeof(Texture2D), false);
-                EditorGUILayout.ObjectField("Text 字体", settings.LegacyFont, typeof(Font), false);
-                EditorGUILayout.ObjectField("TMP 字体", settings.TMPFont, typeof(TMP_FontAsset), false);
+                EditorGUILayout.EnumPopup("来源类型", settings.source);
+                EditorGUILayout.ObjectField("Text 字体纹理", settings.legacyFont != null
+                    ? settings.legacyFont.material?.mainTexture : null, typeof(Texture2D), false);
+                EditorGUILayout.ObjectField("TMP 字体纹理", settings.tmpFont != null
+                    ? settings.tmpFont.atlasTexture : null, typeof(Texture2D), false);
+                EditorGUILayout.ObjectField("Text 字体", settings.legacyFont, typeof(Font), false);
+                EditorGUILayout.ObjectField("TMP 字体", settings.tmpFont, typeof(TMP_FontAsset), false);
             }
         }
     }
