@@ -110,7 +110,9 @@ var options = new FontReplacementOptions {
     sourceFont = oldTmpFont,
     targetFont = newTmpFont
 };
+
 var preview = FontReplacementScanner.Scan(options);
+
 // 可检查 preview.entries，设置 entry.selected = false 以排除。
 var result = FontReplacementApplier.Apply(preview);
 ```
