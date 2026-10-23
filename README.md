@@ -21,6 +21,7 @@ UniKit 是 Z Studio 持续维护的 Unity 工具与组件集合，收集可复�
 | --- | --- | --- |
 | [Sprite Font Generator（SFGen）](Packages/com.z-studio.unikit.sfgen/README.md) | 将 Sprite 纹理、散图或 SpriteAtlas 制作为 UGUI Text / TextMeshPro 彩色位图字体 | `com.z-studio.unikit.sfgen` |
 | [Texture Slicer](Packages/com.z-studio.unikit.texture-slicer/README.md) | 长图、大图与图集切割，支持重叠分块、行列均分、透明裁剪及 PNG / 坐标清单导出 | `com.z-studio.unikit.texture-slicer` |
+| [Component Replacer](Packages/com.z-studio.unikit.component-replacer/README.md) | 指定对象 / 多选 Prefab / 文件夹批量替换组件，支持字段迁移、引用更新、场景撤销和资产备份还原 | `com.z-studio.unikit.component-replacer` |
 | [Shell](Packages/com.z-studio.unikit.shell/README.md) | 在 Unity Editor 中执行外部命令，支持输出收集、标准输入、异步等待和协程 | `com.z-studio.unikit.shell` |
 
 各 Kit 的配置方法、API、依赖及使用限制见对应文档。新增 Kit 时会继续扩展以上索引。
@@ -84,6 +85,7 @@ UniKit/Packages/<包目录>/package.json
 | UI Safe Area / Camera Scaler | 按对应 Kit 文档在自己的 UI 或相机对象上添加组件 |
 | Sprite Font Generator | 菜单 **Tools → UniKit → Sprite Font Generator** |
 | Texture Slicer | 菜单 **Tools → UniKit → Texture Slicer** |
+| Component Replacer | 菜单 **Tools → UniKit → Component Replacer**，或 Inspector 组件右键 **Replace Component…** |
 | Shell | 在编辑器脚本中调用，见包文档的执行与等待示例 |
 
 示例源文件位于各包的 `Samples~` 目录；通过 Package Manager 导入后，在项目的 `Assets/Samples` 下打开场景。

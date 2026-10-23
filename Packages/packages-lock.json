@@ -223,6 +223,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.z-studio.unikit.component-replacer": {
+      "version": "file:com.z-studio.unikit.component-replacer",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.z-studio.unikit.font-replacer": {
       "version": "file:com.z-studio.unikit.font-replacer",
       "depth": 0,

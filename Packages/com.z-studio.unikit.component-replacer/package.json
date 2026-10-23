@@ -1,0 +1,16 @@
+{
+  "name": "com.z-studio.unikit.component-replacer",
+  "version": "1.1.0",
+  "displayName": "Component Replacer",
+  "description": "Batch replace components in selected objects, prefab assets and folders with data migration, reference repair and asset backups.",
+  "unity": "6000.0",
+  "author": {
+    "name": "Z Studio"
+  },
+  "keywords": [
+    "editor",
+    "component",
+    "replace",
+    "migration"
+  ]
+}
