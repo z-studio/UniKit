@@ -56,10 +56,23 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
         [SerializeField]
         private Text[] m_SectorLabels;
 
+        private DemoSectorGraphic m_SectorsGraphic;
+        private Image m_ReelImage;
+        private bool m_ReelImageWasEnabled;
+        private float m_FirstSectorAngle;
+
         private string m_LastResult = "No result";
 
         private void Start() {
-            m_Wheel.Initialize(m_SectorsCount);
+            if (!m_Wheel.HasRewards && !m_Wheel.HasCustomSectors) m_Wheel.Initialize(m_SectorsCount);
+            m_ReelImage = m_Wheel.Reel.GetComponent<Image>();
+            m_ReelImageWasEnabled = m_ReelImage && m_ReelImage.enabled;
+
+            if (m_SectorLabels != null && m_SectorLabels.Length > 0) {
+                var position = m_SectorLabels[0].rectTransform.anchoredPosition;
+                m_FirstSectorAngle = Mathf.Atan2(position.x, position.y) * Mathf.Rad2Deg;
+            }
+
             RefreshUI();
         }
 
@@ -69,6 +82,7 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             }
 
             m_Wheel.Completed += OnCompleted;
+            m_Wheel.RewardCompleted += OnRewardCompleted;
             m_Wheel.Cancelled += OnCancelled;
             m_DecreaseButton.onClick.AddListener(DecreaseTarget);
             m_IncreaseButton.onClick.AddListener(IncreaseTarget);
@@ -86,6 +100,7 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             }
 
             m_Wheel.Completed -= OnCompleted;
+            m_Wheel.RewardCompleted -= OnRewardCompleted;
             m_Wheel.Cancelled -= OnCancelled;
             m_DecreaseButton.onClick.RemoveListener(DecreaseTarget);
             m_IncreaseButton.onClick.RemoveListener(IncreaseTarget);
@@ -98,6 +113,11 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
 
         private void OnCompleted(int index) {
             m_LastResult = $"Completed: sector {index}";
+            RefreshUI();
+        }
+
+        private void OnRewardCompleted(WheelReward reward) {
+            m_LastResult = $"Completed: {reward.Name}";
             RefreshUI();
         }
 
@@ -146,6 +166,28 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
                 return;
             }
 
+            if (!m_Wheel.ValidateSectors(out _)) return;
+
+            if (m_Wheel.HasCustomSectors && !m_SectorsGraphic) {
+                m_SectorsGraphic =
+                    new GameObject("Custom Sectors", typeof(RectTransform), typeof(CanvasRenderer),
+                        typeof(DemoSectorGraphic)).GetComponent<DemoSectorGraphic>();
+                m_SectorsGraphic.transform.SetParent(reel, false);
+                m_SectorsGraphic.transform.SetAsFirstSibling();
+                m_SectorsGraphic.rectTransform.anchorMin = Vector2.zero;
+                m_SectorsGraphic.rectTransform.anchorMax = Vector2.one;
+                m_SectorsGraphic.rectTransform.offsetMin = Vector2.zero;
+                m_SectorsGraphic.rectTransform.offsetMax = Vector2.zero;
+                m_SectorsGraphic.raycastTarget = false;
+            }
+
+            if (m_SectorsGraphic) {
+                m_SectorsGraphic.gameObject.SetActive(m_Wheel.HasCustomSectors);
+                if (m_Wheel.HasCustomSectors) m_SectorsGraphic.SetLayout(m_Wheel, m_FirstSectorAngle);
+            }
+
+            if (m_ReelImage) m_ReelImage.enabled = m_ReelImageWasEnabled && !m_Wheel.HasCustomSectors;
+
             if (m_SectorLabels.Length < m_Wheel.SectorsCount) {
                 var previousCount = m_SectorLabels.Length;
                 System.Array.Resize(ref m_SectorLabels, m_Wheel.SectorsCount);
@@ -167,9 +209,17 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
                     continue;
                 }
 
-                var radians = -m_Wheel.GetSectorAngle(index) * Mathf.Deg2Rad;
-                label.rectTransform.anchoredPosition = new Vector2(-Mathf.Sin(radians), Mathf.Cos(radians)) * radius;
-                
+                var reward = m_Wheel.GetReward(index);
+                label.text = reward == null ? index.ToString() : $"{index}\n{reward.Name}";
+                label.rectTransform.sizeDelta = reward == null ? new Vector2(56, 48) : new Vector2(140, 82);
+                label.resizeTextForBestFit = reward != null;
+                label.resizeTextMinSize = 12;
+                label.resizeTextMaxSize = 26;
+                label.raycastTarget = false;
+                var direction = m_Wheel.SectorDirection == SpinDirection.ClockWise ? 1 : -1;
+                var radians = (m_FirstSectorAngle + direction * m_Wheel.GetSectorCenterOffset(index)) * Mathf.Deg2Rad;
+                label.rectTransform.anchoredPosition = new Vector2(Mathf.Sin(radians), Mathf.Cos(radians)) * radius;
+
                 // 编号随扇区移动，文字保持正向；不参与射线检测，不遮挡转盘按钮。
                 label.rectTransform.localRotation = Quaternion.Euler(0, 0, -reel.localEulerAngles.z);
             }
@@ -184,11 +234,13 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             m_DebugPanel.SetActive(m_ShowDebugPanel);
             m_StateLabel.text = $"State: {m_Wheel.State}";
             m_ResultLabel.text = m_LastResult;
-            m_TargetLabel.text = $"Target: {m_TargetIndex} / {m_Wheel.SectorsCount - 1}";
+            var targetReward = m_Wheel.GetReward(m_TargetIndex);
+            m_TargetLabel.text = targetReward == null ? $"Target: {m_TargetIndex} / {m_Wheel.SectorsCount - 1}"
+                : $"{m_TargetIndex}: {targetReward.Name}";
             m_DecreaseButton.interactable = m_TargetIndex > 0;
             m_IncreaseButton.interactable = m_TargetIndex < m_Wheel.SectorsCount - 1;
-            
-            var canStart = m_Wheel.isActiveAndEnabled && !m_Wheel.IsSpinning;
+
+            var canStart = m_Wheel.isActiveAndEnabled && !m_Wheel.IsSpinning && m_Wheel.ValidateSectors(out _);
             m_SpinButton.interactable = canStart;
             m_CenterSpinButton.interactable = canStart;
             m_BeginWaitingButton.interactable = canStart;

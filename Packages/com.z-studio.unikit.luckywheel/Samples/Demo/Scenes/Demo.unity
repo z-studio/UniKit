@@ -168,18 +168,94 @@ MonoBehaviour:
   m_Reel: {fileID: 2016387334}
   m_PointerController: {fileID: 1622896530}
   m_SectorsCount: 6
+  m_Rewards:
+  - m_Id: sector_0
+    m_Name: Coins
+    m_View: {fileID: 300000170}
+    m_Data: {fileID: 0}
+  - m_Id: sector_1
+    m_Name: Gems
+    m_View: {fileID: 300000180}
+    m_Data: {fileID: 0}
+  - m_Id: sector_2
+    m_Name: Ticket
+    m_View: {fileID: 300000190}
+    m_Data: {fileID: 0}
+  - m_Id: sector_3
+    m_Name: Bonus
+    m_View: {fileID: 300000200}
+    m_Data: {fileID: 0}
+  - m_Id: sector_4
+    m_Name: Gift
+    m_View: {fileID: 300000210}
+    m_Data: {fileID: 0}
+  - m_Id: sector_5
+    m_Name: Try again
+    m_View: {fileID: 300000220}
+    m_Data: {fileID: 0}
   m_ZeroAngle: 0
   m_SectorDirection: 1
   m_SpinDirection: 0
-  m_MainRotationTime: 3
+  m_MainRotationTime: 1
   m_MinimumTurns: 2
   m_SpinStartDelay: 1
   m_WaitingSpeed: 720
-  m_AccelerationTime: 0.4
-  m_LandingJitter: 0
+  m_AccelerationTime: 0.6
+  m_DecelerationTime: 1.8
+  m_CustomAccelerationRhythm: 0
+  m_AccelerationRhythm:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  m_CustomDecelerationRhythm: 0
+  m_DecelerationRhythm:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 0
+      outSlope: 0
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0
+      outWeight: 0
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
   m_UseUnscaledTime: 0
-  m_InRotationTime: 0.5
-  m_InRotationAngle: 10
+  m_InRotationTime: 0.2
+  m_InRotationAngle: 3
+  m_CustomInRhythm: 0
   m_InRotationCurve:
     serializedVersion: 2
     m_Curve:
@@ -204,8 +280,9 @@ MonoBehaviour:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
-  m_OutRotationTime: 0.5
-  m_OutRotationAngle: 10
+  m_OutRotationTime: 0.3
+  m_OutRotationAngle: 2
+  m_CustomOutRhythm: 0
   m_OutRotationCurve:
     serializedVersion: 2
     m_Curve:
@@ -236,6 +313,9 @@ MonoBehaviour:
     m_PersistentCalls:
       m_Calls: []
   m_ResultEvent:
+    m_PersistentCalls:
+      m_Calls: []
+  m_RewardEvent:
     m_PersistentCalls:
       m_Calls: []
   m_CompleteEvent:
