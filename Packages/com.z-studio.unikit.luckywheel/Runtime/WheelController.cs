@@ -23,14 +23,12 @@ namespace ZStudio.UniKit.LuckyWheel {
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
     public class WheelController : MonoBehaviour {
-        [Header("References")]
         [SerializeField]
         private Transform m_Reel;
 
         [SerializeField]
         private PointerController m_PointerController;
 
-        [Header("Sector Layout")]
         [Min(1), SerializeField]
         private int m_SectorsCount = 6;
 
@@ -42,7 +40,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private SpinDirection m_SectorDirection = SpinDirection.ClockWise;
 
-        [Header("Motion")]
         [SerializeField]
         private SpinDirection m_SpinDirection = SpinDirection.Counter;
 
@@ -71,7 +68,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private bool m_UseUnscaledTime;
 
-        [Header("Spin In / 起转预摆")]
         [Tooltip("主旋转前反向预摆的时长；0 表示跳过此阶段。")]
         [Min(0), SerializeField]
         private float m_InRotationTime = 0.2f;
@@ -84,7 +80,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private AnimationCurve m_InRotationCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
-        [Header("Spin Out / 停转回摆")]
         [Tooltip("主旋转越过目标后回摆归位的时长；0 表示直接停到目标。")]
         [Min(0), SerializeField]
         private float m_OutRotationTime = 0.2f;
@@ -97,14 +92,12 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private AnimationCurve m_OutRotationCurve = AnimationCurve.EaseInOut(0, 0, 1, 1);
 
-        [Header("Audio (Optional)")]
         [SerializeField]
         private AudioClip m_SpinSound;
 
         [SerializeField]
         private AudioClip m_HitTargetSound;
 
-        [Header("Events")]
         [SerializeField]
         private UnityEvent m_StartedEvent = new();
 
