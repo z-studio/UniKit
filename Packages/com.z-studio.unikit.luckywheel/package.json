@@ -1,0 +1,14 @@
+{
+  "name": "com.z-studio.unikit.luckywheel",
+  "displayName": "Lucky Wheel",
+  "version": "1.0.0",
+  "unity": "6000.0",
+  "description": "Configurable equal-sector wheel with deterministic results, server-result waiting, pointer feedback and Inspector debugging. No external tween dependency.",
+  "author": {
+    "name": "Z Studio"
+  },
+  "dependencies": {
+    "com.unity.modules.audio": "1.0.0",
+    "com.unity.ugui": "2.0.0"
+  }
+}

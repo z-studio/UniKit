@@ -237,6 +237,15 @@
         "com.unity.ugui": "2.0.0"
       }
     },
+    "com.z-studio.unikit.luckywheel": {
+      "version": "file:com.z-studio.unikit.luckywheel",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.modules.audio": "1.0.0",
+        "com.unity.ugui": "2.0.0"
+      }
+    },
     "com.z-studio.unikit.sfgen": {
       "version": "file:com.z-studio.unikit.sfgen",
       "depth": 0,
