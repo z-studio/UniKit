@@ -14,6 +14,7 @@ UniKit 是 Z Studio 持续维护的 Unity 工具与组件集合，收集可复�
 | [UI Marquee](Packages/com.z-studio.unikit.ui.marquee/README.md) | 公告与跑马灯，支持图文混排、逐条轮播、连续滚动及可选 Spine 片段 | `com.z-studio.unikit.ui.marquee` |
 | [UI Safe Area](Packages/com.z-studio.unikit.ui.safearea/README.md) | UI 安全区适配，支持逐边留白、居中，以及子元素向非安全区外扩或平移 | `com.z-studio.unikit.ui.safearea` |
 | [Camera Scaler](Packages/com.z-studio.unikit.camera-scaler/README.md) | 根据参考分辨率与屏幕比例适配正交相机可视范围或透视相机视野角 | `com.z-studio.unikit.camera-scaler` |
+| [UI Card Curl（咪牌）](Packages/com.z-studio.unikit.ui.card-curl/README.md) | 基于 CurlEffect 的 UGUI 四角/四边咪牌，支持旋转及父级缩放，包含遮罩、阴影和翻牌动画 | `com.z-studio.unikit.ui.card-curl` |
 
 ### 编辑器工具
 
@@ -83,6 +84,7 @@ UniKit/Packages/<包目录>/package.json
 | UI Banner Carousel | 示例需要安装 Input System，并启用新输入系统或 Both；导入 Demo 后打开 `Scenes/MinimalDemo.unity` 体验基础图片轮播，`Scenes/Demo.unity` 展示 Spine 与混合页面，完整示例还需要 Spine Unity 4.2 |
 | UI Marquee | 导入 Demo 后打开 `Scenes/Demo.unity`；示例需要安装 Input System，并启用新输入系统或 Both |
 | UI Safe Area / Camera Scaler | 按对应 Kit 文档在自己的 UI 或相机对象上添加组件 |
+| UI Card Curl | 菜单 **Tools → UniKit → UI Card Curl → Open Demo**，或导入包的 Demo 后打开 `Demo.unity`；支持工程现有的 UGUI 输入模块 |
 | Sprite Font Generator | 菜单 **Tools → UniKit → Sprite Font Generator** |
 | Texture Slicer | 菜单 **Tools → UniKit → Texture Slicer** |
 | Component Replacer | 菜单 **Tools → UniKit → Component Replacer**，或 Inspector 组件右键 **Replace Component…** |

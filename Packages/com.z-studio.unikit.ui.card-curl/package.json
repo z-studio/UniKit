@@ -1,0 +1,19 @@
+{
+  "name": "com.z-studio.unikit.ui.card-curl",
+  "displayName": "UI Card Curl",
+  "version": "1.0.0",
+  "unity": "6000.0",
+  "description": "UGUI card curl with local-space gestures, masks and animation that support rotated and scaled parents.",
+  "author": {
+    "name": "Z Studio"
+  },
+  "dependencies": {
+    "com.unity.ugui": "2.0.0"
+  },
+  "samples": [
+    {
+      "displayName": "Demo",
+      "path": "Samples~/Demo"
+    }
+  ]
+}

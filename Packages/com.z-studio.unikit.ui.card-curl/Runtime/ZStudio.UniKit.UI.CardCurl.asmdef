@@ -1,0 +1,14 @@
+{
+    "name": "ZStudio.UniKit.UI.CardCurl",
+    "rootNamespace": "ZStudio.UniKit.UI",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

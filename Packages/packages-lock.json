@@ -223,6 +223,14 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.z-studio.unikit.ui.card-curl": {
+      "version": "file:com.z-studio.unikit.ui.card-curl",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0"
+      }
+    },
     "com.z-studio.unikit.component-replacer": {
       "version": "file:com.z-studio.unikit.component-replacer",
       "depth": 0,
