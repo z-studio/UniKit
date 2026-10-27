@@ -2,12 +2,13 @@ using System;
 using UnityEngine;
 
 namespace ZStudio.UniKit.LuckyWheel {
-    /// <summary>一格的结果映射。表现对象与业务数据仅保存引用，由接入方负责创建、布局和表现。</summary>
+    /// <summary>
+    /// 一格奖励的配置，不执行抽奖或发奖。使用奖励列表索引指定圆盘停在哪一格。
+    /// View 是场景美术，Data 是可保存到资产的 Unity 数据，UserData 是仅运行时存在的普通 C# 数据。
+    /// 对象与数据均为引用；创建、布局和中奖表现由接入方负责。
+    /// </summary>
     [Serializable]
     public sealed class WheelReward {
-        [SerializeField]
-        private string m_Id;
-
         [SerializeField]
         private string m_Name;
 
@@ -17,8 +18,8 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private UnityEngine.Object m_Data;
 
-        public string Id => m_Id;
-        public string Name => string.IsNullOrWhiteSpace(m_Name) ? m_Id : m_Name;
+        /// <summary>可选名称，方便 Inspector、日志和示例显示，不决定美术文字，也不用于查找奖格。</summary>
+        public string Name => m_Name;
 
         /// <summary>场景中该格的表现根对象，可包含图片、Spine、特效或任意组合；组件不修改它。</summary>
         public GameObject View => m_View;
@@ -29,10 +30,8 @@ namespace ZStudio.UniKit.LuckyWheel {
         /// <summary>运行时业务数据，可传任意 C# 对象，不参与 Unity 序列化。</summary>
         public object UserData { get; }
 
-        public WheelReward(string id, string name = null, GameObject view = null,
+        public WheelReward(string name = null, GameObject view = null,
             UnityEngine.Object data = null, object userData = null) {
-            if (string.IsNullOrWhiteSpace(id)) throw new ArgumentException("Reward id must not be empty.", nameof(id));
-            m_Id = id;
             m_Name = name;
             m_View = view;
             m_Data = data;
@@ -40,6 +39,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         }
 
         // 复制映射，外部对象仍为引用；不复制场景层级或业务数据。
-        internal WheelReward Copy() => new(m_Id, m_Name, m_View, m_Data, UserData);
+        internal WheelReward Copy() => new(m_Name, m_View, m_Data, UserData);
     }
 }

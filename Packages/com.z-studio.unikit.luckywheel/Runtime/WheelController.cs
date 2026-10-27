@@ -4,34 +4,42 @@ using UnityEngine;
 using UnityEngine.Events;
 
 namespace ZStudio.UniKit.LuckyWheel {
+    /// <summary>从圆盘正面看的转动方向；不改变奖格固定按顺时针编号的约定。</summary>
     public enum SpinDirection {
         Counter,
         ClockWise
     }
 
+    /// <summary>只决定目标格内的停止位置，不决定哪个奖格中奖。</summary>
     public enum WheelLandingMode {
         Center,
         Fixed,
         Random
     }
 
+    /// <summary>每轮运行阶段。声明顺序保留序列化值；实际执行顺序见控制器类说明。</summary>
     public enum WheelState {
-        Idle,
-        Spinning,
-        Stopping,
-        Starting,
-        Settling,
-        Accelerating,
-        Decelerating
+        Idle, // 空闲，可以改配置或发起下一轮。
+        Spinning, // 匀速等待业务结果，尚未锁定目标。
+        Stopping, // 已有目标，仍匀速补足距离，尚未开始减速。
+        Starting, // 可选的起转前反向回拉。
+        Settling, // 可选的越过目标后反向回摆。
+        Accelerating, // 从静止加速到设定转速。
+        Decelerating // 从设定转速减速到静止。
     }
 
     /// <summary>
     /// 转盘的表现组件。调用方决定结果；组件只负责旋转、对齐、指针反馈和完成通知。
-    /// 所有角度均为 Reel 的本地 Z 角度，编号方向与旋转方向相互独立。
+    /// 阅读主线：TryStartSpin / BeginSpin → PrepareSpin → Advance → CompleteSpin。
+    /// 阶段顺序：等待延迟 → 回拉（可选）→ 加速 → 匀速 → 减速 → 回摆（可选）→ 完成。
+    /// BeginSpin 在匀速阶段等待 StopAt；提前收到结果也会先完成回拉和加速。
+    /// Reel 是实际旋转的圆盘，角度就是它相对父物体的 Rotation Z；奖格固定按顺时针编号。
     /// </summary>
     [DisallowMultipleComponent]
     [RequireComponent(typeof(AudioSource))]
     public class WheelController : MonoBehaviour {
+        // 配置区：圆盘与奖格几何、奖励映射、各阶段运动、音效和通知。
+        // 所有配置接口要求空闲；本轮开始时锁定方向与节奏，结果提交时锁定目标。
         [SerializeField]
         private Transform m_Reel;
 
@@ -56,22 +64,17 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private Vector2 m_LandingRange = new(-0.25f, 0.25f);
 
-        [Tooltip("列表顺序对应 0、1、2……号奖格。配置后奖格数量自动跟随列表。空列表仍可只按编号转动。")]
+        [Tooltip("列表顺序对应顺时针排列的 0、1、2……号奖格。配置后奖格数量自动跟随列表。空列表仍可只按编号转动。")]
         [SerializeField]
         private List<WheelReward> m_Rewards = new();
 
-        [Tooltip("0 号扇区中心对准指针时，Reel 的本地 Z 角度。")]
+        [Tooltip("0 号扇区中心对准指针时，Reel 的本地 Z 角度（Local Rotation Z）。")]
         [SerializeField]
         private float m_ZeroAngle;
-
-        [Tooltip("美术上的扇区编号方向，与转动方向无关。索引从 0 开始。")]
-        [SerializeField]
-        private SpinDirection m_SectorDirection = SpinDirection.ClockWise;
 
         [SerializeField]
         private SpinDirection m_SpinDirection = SpinDirection.Counter;
 
-        [InspectorName("Minimum Cruise Time")]
         [Tooltip("本轮至少匀速转动的时间，已等待的匀速时间计入。对齐目标或满足最少圈数时可能延长，不通过突然改变转速来凑时长。")]
         [Min(0), SerializeField]
         private float m_MainRotationTime = 3f;
@@ -83,7 +86,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         [Min(0), SerializeField]
         private float m_SpinStartDelay;
 
-        [InspectorName("Cruise Speed")]
         [Tooltip("两种结果流程共用的稳定转速，单位：度/秒。收到结果后不会突然加速或改变旋转方向。")]
         [Min(1), SerializeField]
         private float m_WaitingSpeed = 720f;
@@ -100,7 +102,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         private bool m_CustomAccelerationRhythm;
 
         [Tooltip("加速作用的非负权重：前段权重大则更早提速，后段权重大则更晚提速。组件负责速度和加速度的边界衔接。")]
-        [InspectorName("Acceleration Weight")]
         [SerializeField]
         private AnimationCurve m_AccelerationRhythm = AnimationCurve.Constant(0, 1, 1);
 
@@ -108,7 +109,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         private bool m_CustomDecelerationRhythm;
 
         [Tooltip("制动作用的非负权重：前段权重大则更早降速，后段权重大则更晚降速。总减速时间不变。")]
-        [InspectorName("Braking Weight")]
         [SerializeField]
         private AnimationCurve m_DecelerationRhythm = AnimationCurve.Constant(0, 1, 1);
 
@@ -123,12 +123,10 @@ namespace ZStudio.UniKit.LuckyWheel {
         [Min(0), SerializeField]
         private float m_InRotationAngle;
 
-        [InspectorName("Custom Pre-swing Rhythm")]
         [SerializeField]
         private bool m_CustomInRhythm;
 
         [Tooltip("预摆的非负速度权重，不是角度进度。组件自动归一化距离，并在两端平滑静止。")]
-        [InspectorName("Pre-swing Velocity Weight")]
         [SerializeField]
         private AnimationCurve m_InRotationCurve = AnimationCurve.Constant(0, 1, 1);
 
@@ -140,12 +138,10 @@ namespace ZStudio.UniKit.LuckyWheel {
         [Min(0), SerializeField]
         private float m_OutRotationAngle;
 
-        [InspectorName("Custom Recoil Rhythm")]
         [SerializeField]
         private bool m_CustomOutRhythm;
 
         [Tooltip("回摆的非负速度权重，不是角度进度。组件自动归一化距离，并在两端平滑静止。")]
-        [InspectorName("Recoil Velocity Weight")]
         [SerializeField]
         private AnimationCurve m_OutRotationCurve = AnimationCurve.Constant(0, 1, 1);
 
@@ -170,9 +166,11 @@ namespace ZStudio.UniKit.LuckyWheel {
         [SerializeField]
         private UnityEvent m_CancelledEvent = new();
 
+        // 对外状态区：Target 是本轮已锁定的目标；Win 只在完整停准后成立，-1 表示无结果。
         public WheelState State { get; private set; }
         public bool IsSpinning => State != WheelState.Idle;
 
+        /// <summary>等待流程尚未锁定结果时为 true；StopAt 仅接受第一次提交。</summary>
         public bool CanSubmitResult =>
             State is WheelState.Starting or WheelState.Accelerating or WheelState.Spinning
             && TargetSectorIndex < 0;
@@ -185,7 +183,7 @@ namespace ZStudio.UniKit.LuckyWheel {
         public int SectorsCount => HasRewards ? m_Rewards.Count : m_SectorsCount;
         public bool HasCustomSectors => m_CustomSectors;
         public WheelLandingMode LandingMode => m_LandingMode;
-        public bool HasRewards => m_Rewards != null && m_Rewards.Count > 0;
+        public bool HasRewards => m_Rewards is { Count: > 0 };
         public IReadOnlyList<WheelReward> Rewards => m_Rewards.AsReadOnly();
         public WheelReward TargetReward { get; private set; }
         public WheelReward WinReward { get; private set; }
@@ -194,12 +192,13 @@ namespace ZStudio.UniKit.LuckyWheel {
         public event Action<WheelReward> RewardCompleted;
 
         public float ZeroAngle => m_ZeroAngle;
-        public SpinDirection SectorDirection => m_SectorDirection;
         public Transform Reel => m_Reel;
         public bool UseUnscaledTime => m_UseUnscaledTime;
         public event Action<int> Completed;
         public event Action Cancelled;
 
+        // 本轮运动数据：内部角度不按 360° 归零，用于累计圈数和检测跨格。
+        // 只有写入 Transform 时取余；使用 double 降低多圈累计的精度损失。
         private AudioSource m_AudioSource;
         private Action m_OnComplete;
         private float m_DelayRemaining;
@@ -255,13 +254,18 @@ namespace ZStudio.UniKit.LuckyWheel {
                 m_OutRotationCurve = AnimationCurve.Constant(0, 1, 1);
             }
 
-            if (!IsValidStageCurve(m_AccelerationRhythm)) m_AccelerationRhythm = AnimationCurve.Constant(0, 1, 1);
-            if (!IsValidStageCurve(m_DecelerationRhythm)) m_DecelerationRhythm = AnimationCurve.Constant(0, 1, 1);
+            if (!IsValidStageCurve(m_AccelerationRhythm)) {
+                m_AccelerationRhythm = AnimationCurve.Constant(0, 1, 1);
+            }
+
+            if (!IsValidStageCurve(m_DecelerationRhythm)) {
+                m_DecelerationRhythm = AnimationCurve.Constant(0, 1, 1);
+            }
         }
 
-        /// <summary>配置布局，不改变当前视觉角度。正在转动时不允许更换布局。</summary>
-        public void Configure(Transform reel, int sectorsCount, float zeroAngle = 0,
-            SpinDirection sectorDirection = SpinDirection.ClockWise) {
+        // 配置入口：Inspector 已填写时，通常直接调用 TryStartSpin(index) 即可。
+        /// <summary>配置顺时针编号的布局，不改变当前视觉角度。正在转动时不允许更换布局。</summary>
+        public void Configure(Transform reel, int sectorsCount, float zeroAngle = 0) {
             RequireIdle();
 
             if (!reel) {
@@ -274,7 +278,6 @@ namespace ZStudio.UniKit.LuckyWheel {
             m_Reel = reel;
             m_SectorsCount = sectorsCount;
             m_ZeroAngle = zeroAngle;
-            m_SectorDirection = sectorDirection;
             WinSectorIndex = -1;
             TargetSectorIndex = -1;
             TargetReward = WinReward = null;
@@ -294,14 +297,28 @@ namespace ZStudio.UniKit.LuckyWheel {
         /// <summary>运行时配置每格奖励。列表顺序即奖格顺序；先校验全部数据再替换，不保存到场景。</summary>
         public void ConfigureRewards(IEnumerable<WheelReward> rewards) {
             RequireIdle();
-            if (rewards == null) throw new ArgumentNullException(nameof(rewards));
+
+            if (rewards == null) {
+                throw new ArgumentNullException(nameof(rewards));
+            }
+
             var replacement = new List<WheelReward>(rewards);
-            if (replacement.Count == 0)
+
+            if (replacement.Count == 0) {
                 throw new ArgumentException("At least one reward is required. Use ClearRewards for index-only mode.",
                     nameof(rewards));
-            if (!ValidateRewardList(replacement, out var error)) throw new ArgumentException(error, nameof(rewards));
+            }
+
+            if (!ValidateRewardList(replacement, out var error)) {
+                throw new ArgumentException(error, nameof(rewards));
+            }
+
             RequireMatchingSectorCount(replacement.Count);
-            for (var index = 0; index < replacement.Count; index++) replacement[index] = replacement[index].Copy();
+
+            for (var index = 0; index < replacement.Count; index++) {
+                replacement[index] = replacement[index].Copy();
+            }
+
             m_Rewards = replacement;
             m_SectorsCount = replacement.Count;
             WinSectorIndex = TargetSectorIndex = -1;
@@ -317,60 +334,24 @@ namespace ZStudio.UniKit.LuckyWheel {
             TargetReward = WinReward = null;
         }
 
+        /// <summary>按编号读取奖励配置；未配置奖励列表时返回 null，非法编号抛出异常。</summary>
         public WheelReward GetReward(int sectorIndex) {
-            if (sectorIndex < 0 || sectorIndex >= SectorsCount)
+            if (sectorIndex < 0 || sectorIndex >= SectorsCount) {
                 throw new ArgumentOutOfRangeException(nameof(sectorIndex));
-            return HasRewards ? m_Rewards[sectorIndex] : null;
-        }
-
-        /// <summary>按唯一标识查找奖格；区分大小写。未找到返回 -1。</summary>
-        public int FindRewardIndex(string rewardId) {
-            if (!HasRewards || string.IsNullOrWhiteSpace(rewardId)) return -1;
-
-            for (var index = 0; index < m_Rewards.Count; index++) {
-                if (m_Rewards[index] != null && string.Equals(m_Rewards[index].Id, rewardId, StringComparison.Ordinal))
-                    return index;
             }
 
-            return -1;
-        }
-
-        public bool TryStartSpinReward(string rewardId, Action onComplete = null) {
-            var index = FindRewardIndex(rewardId);
-            return index >= 0 && TryStartSpin(index, onComplete);
-        }
-
-        public bool StopAtReward(string rewardId, Action onComplete = null) {
-            var index = FindRewardIndex(rewardId);
-            return index >= 0 && StopAt(index, onComplete);
-        }
-
-        public bool TryStartSpinReward(string rewardId, float offset, Action onComplete = null) {
-            var index = FindRewardIndex(rewardId);
-            return index >= 0 && TryStartSpin(index, offset, onComplete);
-        }
-
-        public bool StopAtReward(string rewardId, float offset, Action onComplete = null) {
-            var index = FindRewardIndex(rewardId);
-            return index >= 0 && StopAt(index, offset, onComplete);
+            return HasRewards ? m_Rewards[sectorIndex] : null;
         }
 
         public bool ValidateRewards(out string error) => ValidateRewardList(m_Rewards, out error);
 
         private static bool ValidateRewardList(IReadOnlyList<WheelReward> rewards, out string error) {
-            var identifiers = new HashSet<string>(StringComparer.Ordinal);
-
             if (rewards != null) {
                 for (var index = 0; index < rewards.Count; index++) {
                     var reward = rewards[index];
 
-                    if (reward == null || string.IsNullOrWhiteSpace(reward.Id)) {
-                        error = $"第 {index} 格缺少奖励标识。";
-                        return false;
-                    }
-
-                    if (!identifiers.Add(reward.Id)) {
-                        error = $"第 {index} 格的奖励标识“{reward.Id}”重复。指定结果用的标识必须唯一，名称可以相同。";
+                    if (reward == null) {
+                        error = $"第 {index} 格的奖励配置为空。";
                         return false;
                     }
                 }
@@ -390,10 +371,17 @@ namespace ZStudio.UniKit.LuckyWheel {
         /// <summary>自定义每格宽度（度），按编号顺序排列，总和须为 360。宽度不是中奖概率。</summary>
         public void ConfigureSectorWidths(IEnumerable<float> widths) {
             RequireIdle();
-            if (widths == null) throw new ArgumentNullException(nameof(widths));
+
+            if (widths == null) {
+                throw new ArgumentNullException(nameof(widths));
+            }
+
             var replacement = new List<float>(widths);
-            if (!ValidateSectorWidths(replacement, replacement.Count, out var error))
+
+            if (!ValidateSectorWidths(replacement, replacement.Count, out var error)) {
                 throw new ArgumentException(error, nameof(widths));
+            }
+
             RequireMatchingRewardCount(replacement.Count);
             m_SectorWidths = replacement;
             m_CustomSectors = true;
@@ -441,15 +429,20 @@ namespace ZStudio.UniKit.LuckyWheel {
         }
 
         private void RequireMatchingSectorCount(int count) {
-            if (m_CustomSectors && count != m_SectorWidths.Count)
+            if (m_CustomSectors && count != m_SectorWidths.Count) {
                 throw new InvalidOperationException(
                     "Custom sector widths must match the sector count. ConfigureEqualSectors before changing the count.");
+            }
         }
 
         // 仅消除允许范围内的浮点求和误差，保证圆周首尾完全闭合。
         private double SectorScale() {
             double sum = 0;
-            for (var index = 0; index < m_SectorWidths.Count; index++) sum += m_SectorWidths[index];
+
+            for (var index = 0; index < m_SectorWidths.Count; index++) {
+                sum += m_SectorWidths[index];
+            }
+
             return 360.0 / sum;
         }
 
@@ -458,31 +451,55 @@ namespace ZStudio.UniKit.LuckyWheel {
             return m_CustomSectors ? (float)(m_SectorWidths[sectorIndex] * SectorScale()) : 360f / SectorsCount;
         }
 
-        /// <summary>从 0 号格中心沿编号方向量到指定格中心的角度，与 Reel 当前姿态无关。</summary>
+        /// <summary>从 0 号格中心沿顺时针量到指定格中心的角度，与 Reel 当前姿态无关。</summary>
         public float GetSectorCenterOffset(int sectorIndex) {
             ValidateSectorIndex(sectorIndex);
-            if (!m_CustomSectors) return sectorIndex * (360f / SectorsCount);
+
+            if (!m_CustomSectors) {
+                return sectorIndex * (360f / SectorsCount);
+            }
+
+            // 先累计 0..index-1 的整格宽度，再加目标半格、减 0 号半格，得到两个中心的间距。
             double offset = (m_SectorWidths[sectorIndex] - m_SectorWidths[0]) * 0.5;
-            for (var index = 0; index < sectorIndex; index++) offset += m_SectorWidths[index];
+
+            for (var index = 0; index < sectorIndex; index++) {
+                offset += m_SectorWidths[index];
+            }
+
             return (float)(offset * SectorScale());
         }
 
         private void ValidateSectorIndex(int sectorIndex) {
             ValidateLayout(SectorsCount, m_ZeroAngle);
-            if (!ValidateSectors(out var error)) throw new InvalidOperationException(error);
-            if (sectorIndex < 0 || sectorIndex >= SectorsCount)
+
+            if (!ValidateSectors(out var error)) {
+                throw new InvalidOperationException(error);
+            }
+
+            if (sectorIndex < 0 || sectorIndex >= SectorsCount) {
                 throw new ArgumentOutOfRangeException(nameof(sectorIndex));
+            }
         }
 
         /// <summary>offset 与随机范围以目标格宽度为单位，0 为中心，安全范围为 -0.49～0.49。</summary>
         public void ConfigureLanding(WheelLandingMode mode = WheelLandingMode.Center, float offset = 0,
             Vector2? randomRange = null) {
             RequireIdle();
-            if (!Enum.IsDefined(typeof(WheelLandingMode), mode)) throw new ArgumentOutOfRangeException(nameof(mode));
+
+            if (!Enum.IsDefined(typeof(WheelLandingMode), mode)) {
+                throw new ArgumentOutOfRangeException(nameof(mode));
+            }
+
             var range = randomRange ?? new Vector2(-0.25f, 0.25f);
-            if (!IsFinite(offset) || Mathf.Abs(offset) > 0.49f) throw new ArgumentOutOfRangeException(nameof(offset));
-            if (!IsFinite(range.x) || !IsFinite(range.y) || range.x < -0.49f || range.y > 0.49f || range.x > range.y)
+
+            if (!IsFinite(offset) || Mathf.Abs(offset) > 0.49f) {
+                throw new ArgumentOutOfRangeException(nameof(offset));
+            }
+
+            if (!IsFinite(range.x) || !IsFinite(range.y) || range.x < -0.49f || range.y > 0.49f || range.x > range.y) {
                 throw new ArgumentOutOfRangeException(nameof(randomRange));
+            }
+
             m_LandingMode = mode;
             m_LandingOffset = offset;
             m_LandingRange = range;
@@ -587,12 +604,19 @@ namespace ZStudio.UniKit.LuckyWheel {
         public void ConfigureRhythm(float decelerationTime, AnimationCurve accelerationRhythm = null,
             AnimationCurve decelerationRhythm = null) {
             RequireIdle();
-            if (!IsFinite(decelerationTime) || decelerationTime < 0.05f)
+
+            if (!IsFinite(decelerationTime) || decelerationTime < 0.05f) {
                 throw new ArgumentOutOfRangeException(nameof(decelerationTime));
-            if (accelerationRhythm != null && !IsValidStageCurve(accelerationRhythm))
+            }
+
+            if (accelerationRhythm != null && !IsValidStageCurve(accelerationRhythm)) {
                 throw new ArgumentException("Invalid acceleration weights.", nameof(accelerationRhythm));
-            if (decelerationRhythm != null && !IsValidStageCurve(decelerationRhythm))
+            }
+
+            if (decelerationRhythm != null && !IsValidStageCurve(decelerationRhythm)) {
                 throw new ArgumentException("Invalid braking weights.", nameof(decelerationRhythm));
+            }
+
             m_DecelerationTime = decelerationTime;
             m_CustomAccelerationRhythm = accelerationRhythm != null;
             m_CustomDecelerationRhythm = decelerationRhythm != null;
@@ -620,7 +644,7 @@ namespace ZStudio.UniKit.LuckyWheel {
             }
         }
 
-        /// <summary>指定扇区对准指针时的绝对本地 Z 角。offset 为一格的比例，正值沿编号方向偏向格内一侧。</summary>
+        /// <summary>指定扇区对准指针时的绝对本地 Z 角。offset 为一格的比例，正值沿顺时针偏向格内一侧。</summary>
         public float GetSectorAngle(int sectorIndex, float offset = 0) {
             ValidateSectorIndex(sectorIndex);
 
@@ -628,9 +652,10 @@ namespace ZStudio.UniKit.LuckyWheel {
                 throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            return Mathf.Repeat(
-                m_ZeroAngle - Direction(m_SectorDirection)
-                * (GetSectorCenterOffset(sectorIndex) + offset * GetSectorWidth(sectorIndex)), 360f);
+            // 奖格在美术上向顺时针偏多少度，圆盘就需多转相同的逆时针角度才能将它移到指针下。
+            // 因此本地 Z 角增加；旋转方向只影响到达这个落点的路径。
+            return Mathf.Repeat(m_ZeroAngle + GetSectorCenterOffset(sectorIndex) + offset * GetSectorWidth(sectorIndex),
+                360f);
         }
 
         /// <summary>编辑器对齐和运行时复位入口。仅空闲时生效，不触发中奖通知。</summary>
@@ -649,9 +674,10 @@ namespace ZStudio.UniKit.LuckyWheel {
             return true;
         }
 
-        /// <summary>兼容简单调用。需要判断忙碌/不可用时，使用 TryStartSpin。</summary>
+        /// <summary>按编号发起转动。无需返回值时可用；业务通常用 TryStartSpin 检查是否成功受理。</summary>
         public void StartSpin(int winSectorIndex, Action onComplete = null) => TryStartSpin(winSectorIndex, onComplete);
 
+        /// <summary>编号模式入口。返回 false 表示忙碌、组件未启用或配置不可用；非法编号会抛出异常。</summary>
         public bool TryStartSpin(int winSectorIndex, Action onComplete = null) =>
             TryStartSpin(winSectorIndex, DefaultLandingOffset(), onComplete);
 
@@ -722,6 +748,7 @@ namespace ZStudio.UniKit.LuckyWheel {
             return true;
         }
 
+        // 每轮只从这里重置数据、缓存节奏；不会把圆盘吸附到某格，始终从当前姿态起转。
         private void PrepareSpin() {
             m_Angle = m_Reel.localEulerAngles.z;
             m_ActiveDirection = Direction(m_SpinDirection);
@@ -754,6 +781,7 @@ namespace ZStudio.UniKit.LuckyWheel {
             }
         }
 
+        // 保存本轮快照：后续播放和通知使用同一份结果，不从外部配置重新读取奖励。
         private void LockResult(int target, float angle, Action callback) {
             TargetSectorIndex = target;
             TargetReward = GetReward(target)?.Copy();
@@ -776,27 +804,44 @@ namespace ZStudio.UniKit.LuckyWheel {
             m_Elapsed = 0;
             m_StageStartAngle = m_Angle;
             m_Speed = 0;
-            if (m_AccelerationTime > 0) State = WheelState.Accelerating;
-            else FinishAcceleration();
+
+            if (m_AccelerationTime > 0) {
+                State = WheelState.Accelerating;
+            } else {
+                FinishAcceleration();
+            }
         }
 
         private void FinishAcceleration() {
             m_Elapsed = 0;
             m_Speed = m_WaitingSpeed;
-            if (TargetSectorIndex >= 0) PlanMainStop();
-            else State = WheelState.Spinning;
+
+            if (TargetSectorIndex >= 0) {
+                PlanMainStop();
+            } else {
+                State = WheelState.Spinning;
+            }
         }
 
+        // 规划停止路径，不修改稳定转速或减速时间。结果早到和晚到都复用此入口。
         private void PlanMainStop() {
             m_StopStartAngle = m_Angle;
             var overshoot = m_OutRotationTime > 0 ? m_OutRotationAngle : 0;
             var decelerationDistance = m_WaitingSpeed * m_DecelerationTime * (1 - m_DecelerationProfile.TotalIntegral);
             var current = (float)(m_Angle % 360);
+
+            // 先求沿本轮转向抵达落点所需的不足一圈距离；启用回摆时，主运动先越过目标。
             var distance = Mathf.Repeat((m_LandingAngle - current) * m_ActiveDirection, 360f) + (double)overshoot;
+
             // 保持稳定转速和设定的减速时间。只延长匀速段去满足落点、整轮圈数与最少匀速时间。
             var minimumDistance = Math.Max(m_MinimumTurns * 360.0 - m_ForwardDistance,
                 m_WaitingSpeed * Math.Max(0, m_MainRotationTime - m_CruiseElapsed) + decelerationDistance);
-            if (distance < minimumDistance) distance += Math.Ceiling((minimumDistance - distance) / 360.0) * 360.0;
+
+            if (distance < minimumDistance) {
+                distance += Math.Ceiling((minimumDistance - distance) / 360.0) * 360.0;
+            }
+
+            // 总路程 = 匀速路程 + 固定减速路程；差额只用增加整圈和匀速时间补齐。
             var cruiseDistance = Math.Max(0, distance - decelerationDistance);
             m_CruiseDuration = cruiseDistance / m_WaitingSpeed;
             m_DecelerationStartAngle = m_StopStartAngle + cruiseDistance * m_ActiveDirection;
@@ -809,7 +854,9 @@ namespace ZStudio.UniKit.LuckyWheel {
 
         // 各阶段使用同一条时间线。大帧跨越边界时继续消耗余量，完成回调开启的新轮次不消耗旧轮余量。
         private void Advance(float deltaTime) {
-            if (!IsSpinning || deltaTime <= 0) return;
+            if (!IsSpinning || deltaTime <= 0) {
+                return;
+            }
 
             if (!m_Reel) {
                 CancelSpin();
@@ -838,9 +885,11 @@ namespace ZStudio.UniKit.LuckyWheel {
                     WheelState.Decelerating => m_DecelerationTime,
                     _ => m_OutRotationTime
                 };
+
                 var step = Math.Min(remaining, Math.Max(0, duration - m_Elapsed));
                 m_Elapsed += step;
                 remaining -= step;
+
                 var t = duration <= 0 ? 1 : Math.Min(1, m_Elapsed / duration);
 
                 switch (State) {
@@ -852,10 +901,14 @@ namespace ZStudio.UniKit.LuckyWheel {
                         profile.Evaluate(t, out var progress, out _, out var velocity);
                         m_Speed = (float)(-angle / duration * velocity);
                         ApplyAngle(m_StageStartAngle - angle * m_ActiveDirection * progress, true);
-                        if (t < 1) return;
 
-                        if (starting) FinishStarting();
-                        else {
+                        if (t < 1) {
+                            return;
+                        }
+
+                        if (starting) {
+                            FinishStarting();
+                        } else {
                             CompleteSpin();
                             return;
                         }
@@ -866,7 +919,11 @@ namespace ZStudio.UniKit.LuckyWheel {
                         m_AccelerationProfile.Evaluate(t, out var speed, out var distance, out _);
                         m_Speed = (float)(m_WaitingSpeed * speed);
                         ApplyAngle(m_StageStartAngle + m_WaitingSpeed * duration * distance * m_ActiveDirection, true);
-                        if (t < 1) return;
+
+                        if (t < 1) {
+                            return;
+                        }
+
                         FinishAcceleration();
                         break;
                     }
@@ -874,7 +931,11 @@ namespace ZStudio.UniKit.LuckyWheel {
                         m_Speed = m_WaitingSpeed;
                         m_CruiseElapsed += step;
                         ApplyAngle(m_StopStartAngle + m_WaitingSpeed * m_Elapsed * m_ActiveDirection, true);
-                        if (t < 1) return;
+
+                        if (t < 1) {
+                            return;
+                        }
+
                         m_Elapsed = 0;
                         State = WheelState.Decelerating;
                         break;
@@ -885,7 +946,10 @@ namespace ZStudio.UniKit.LuckyWheel {
                                 : m_DecelerationStartAngle
                                   + m_WaitingSpeed * duration * (t - integral) * m_ActiveDirection,
                             true);
-                        if (t < 1) return;
+
+                        if (t < 1) {
+                            return;
+                        }
 
                         if (m_OutRotationTime <= 0 || m_OutRotationAngle <= 0) {
                             CompleteSpin();
@@ -901,6 +965,7 @@ namespace ZStudio.UniKit.LuckyWheel {
             }
         }
 
+        // 指针音效/拨动只关心有没有跨边界；一帧跨很多格也只反馈一次，避免高转速叠加音效。
         private bool CrossedSectorBoundary(double from, double to) {
             if (!m_CustomSectors) {
                 var step = 360.0 / SectorsCount;
@@ -911,8 +976,12 @@ namespace ZStudio.UniKit.LuckyWheel {
             double edge = -m_SectorWidths[0] * 0.5;
 
             for (var index = 0; index < m_SectorWidths.Count; index++) {
-                var boundary = m_ZeroAngle - Direction(m_SectorDirection) * edge * scale;
-                if (Math.Floor((from - boundary) / 360) != Math.Floor((to - boundary) / 360)) return true;
+                var boundary = m_ZeroAngle + edge * scale;
+
+                if (Math.Floor((from - boundary) / 360) != Math.Floor((to - boundary) / 360)) {
+                    return true;
+                }
+
                 edge += m_SectorWidths[index];
             }
 
@@ -932,11 +1001,13 @@ namespace ZStudio.UniKit.LuckyWheel {
             }
 
             m_Angle = angle;
+            
             var euler = m_Reel.localEulerAngles;
             euler.z = (float)(angle % 360.0);
             m_Reel.localEulerAngles = euler;
         }
 
+        // 只有这里产生停准结果；取消路径不会进入这里，也不会发出完成通知。
         private void CompleteSpin() {
             ApplyAngle(m_LandingAngle, false);
             var result = TargetSectorIndex;
@@ -979,7 +1050,10 @@ namespace ZStudio.UniKit.LuckyWheel {
             m_OnComplete = null;
             TargetSectorIndex = -1;
             TargetReward = null;
-            if (wasSpinning) WinReward = null;
+
+            if (wasSpinning) {
+                WinReward = null;
+            }
 
             if (wasSpinning) {
                 WinSectorIndex = -1;
@@ -1015,55 +1089,76 @@ namespace ZStudio.UniKit.LuckyWheel {
             public double TotalIntegral => m_Integral[k_Segments];
 
             public static bool IsValid(AnimationCurve curve) {
-                if (curve == null || curve.length < 1) return false;
-                foreach (var key in curve.keys)
-                    if (!IsFinite(key.time) || !IsFinite(key.value))
+                if (curve == null || curve.length < 1) {
+                    return false;
+                }
+
+                foreach (var key in curve.keys) {
+                    if (!IsFinite(key.time) || !IsFinite(key.value)) {
                         return false;
+                    }
+                }
+
                 double area = 0;
 
                 for (var i = 0; i <= k_Segments; i++) {
                     var t = (float)i / k_Segments;
                     var weight = curve.Evaluate(t);
-                    if (!IsFinite(weight) || weight < 0) return false;
-                    if (i > 1 && i < k_Segments - 1) area += weight * (double)t * t * (1 - t) * (1 - t);
+
+                    if (!IsFinite(weight) || weight < 0) {
+                        return false;
+                    }
+
+                    if (i is > 1 and < k_Segments - 1) {
+                        area += weight * (double)t * t * (1 - t) * (1 - t);
+                    }
                 }
 
                 return area > 0;
             }
 
+            // 预计算权重、一次积分（速度/进度）和二次积分（位移），避免逐帧数值积分带来帧率差异。
             public void Build(AnimationCurve curve) {
-                const double step = 1.0 / k_Segments;
+                const double k_Step = 1.0 / k_Segments;
                 double area = 0;
 
                 for (var i = 0; i <= k_Segments; i++) {
-                    var t = i * step;
-                    var weight = curve == null ? 1 : curve.Evaluate((float)t);
+                    var t = i * k_Step;
+                    var weight = curve?.Evaluate((float)t) ?? 1;
+
                     // 边界相邻采样也归零，避免分段线性近似让预摆/回摆端点出现微小加速度台阶。
-                    m_Weights[i] = i <= 1 || i >= k_Segments - 1 ? 0 : weight * t * t * (1 - t) * (1 - t);
-                    if (i > 0) area += (m_Weights[i - 1] + m_Weights[i]) * step * 0.5;
+                    m_Weights[i] = i is <= 1 or >= k_Segments - 1 ? 0 : weight * t * t * (1 - t) * (1 - t);
+
+                    if (i > 0) {
+                        area += (m_Weights[i - 1] + m_Weights[i]) * k_Step * 0.5;
+                    }
                 }
 
                 m_Progress[0] = m_Integral[0] = 0;
-                for (var i = 0; i <= k_Segments; i++) m_Weights[i] /= area;
+
+                for (var i = 0; i <= k_Segments; i++) {
+                    m_Weights[i] /= area;
+                }
 
                 for (var i = 1; i <= k_Segments; i++) {
-                    m_Progress[i] = m_Progress[i - 1] + (m_Weights[i - 1] + m_Weights[i]) * step * 0.5;
-                    m_Integral[i] = m_Integral[i - 1] + m_Progress[i - 1] * step
-                                                      + (2 * m_Weights[i - 1] + m_Weights[i]) * step * step / 6;
+                    m_Progress[i] = m_Progress[i - 1] + (m_Weights[i - 1] + m_Weights[i]) * k_Step * 0.5;
+                    m_Integral[i] = m_Integral[i - 1] + m_Progress[i - 1] * k_Step
+                                                      + (2 * m_Weights[i - 1] + m_Weights[i]) * k_Step * k_Step / 6;
                 }
             }
 
+            // t 为阶段时间比例。加速使用 progress 作速度、integral 作位移；
+            // 回拉/回摆使用 progress 作位置、derivative 作速度，减速使用 1-progress 作剩余速度。
             public void Evaluate(double t, out double progress, out double integral, out double derivative) {
-                if (t >= 1) {
-                    progress = 1;
-                    integral = TotalIntegral;
-                    derivative = 0;
-                    return;
-                }
-
-                if (t <= 0) {
-                    progress = integral = derivative = 0;
-                    return;
+                switch (t) {
+                    case >= 1:
+                        progress = 1;
+                        integral = TotalIntegral;
+                        derivative = 0;
+                        return;
+                    case <= 0:
+                        progress = integral = derivative = 0;
+                        return;
                 }
 
                 var index = Math.Min(k_Segments - 1, (int)(t * k_Segments));

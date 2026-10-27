@@ -2,7 +2,11 @@ using UnityEngine;
 using UnityEngine.UI;
 
 namespace ZStudio.UniKit.LuckyWheel.Samples {
-    /// <summary>UGUI 调试示例。业务决定索引，按钮只负责发起旋转和提交结果。</summary>
+    /// <summary>
+    /// 可直接运行的 UGUI 示例：按钮指定结果，转盘组件只播放表现。
+    /// 阅读顺序：OnEnable 绑定交互 → Spin / BeginWaiting / SubmitResult 发起操作 → OnCompleted 显示结果。
+    /// LateUpdate 里的底图生成和文字排布仅用于演示不同格数，不是业务接入必需步骤。
+    /// </summary>
     public class Demo : MonoBehaviour {
         [SerializeField]
         private WheelController m_Wheel;
@@ -19,7 +23,7 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
         [SerializeField]
         private bool m_ShowSectorNumbers = true;
 
-        [Header("UGUI Debug Panel")]
+        [Header("示例界面引用（已在场景中绑定）")]
         [SerializeField]
         private GameObject m_DebugPanel;
 
@@ -64,7 +68,10 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
         private string m_LastResult = "No result";
 
         private void Start() {
-            if (!m_Wheel.HasRewards && !m_Wheel.HasCustomSectors) m_Wheel.Initialize(m_SectorsCount);
+            if (!m_Wheel.HasRewards && !m_Wheel.HasCustomSectors) {
+                m_Wheel.Initialize(m_SectorsCount);
+            }
+
             m_ReelImage = m_Wheel.Reel.GetComponent<Image>();
             m_ReelImageWasEnabled = m_ReelImage && m_ReelImage.enabled;
 
@@ -82,7 +89,6 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             }
 
             m_Wheel.Completed += OnCompleted;
-            m_Wheel.RewardCompleted += OnRewardCompleted;
             m_Wheel.Cancelled += OnCancelled;
             m_DecreaseButton.onClick.AddListener(DecreaseTarget);
             m_IncreaseButton.onClick.AddListener(IncreaseTarget);
@@ -100,7 +106,6 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             }
 
             m_Wheel.Completed -= OnCompleted;
-            m_Wheel.RewardCompleted -= OnRewardCompleted;
             m_Wheel.Cancelled -= OnCancelled;
             m_DecreaseButton.onClick.RemoveListener(DecreaseTarget);
             m_IncreaseButton.onClick.RemoveListener(IncreaseTarget);
@@ -111,7 +116,14 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             m_CenterSpinButton.onClick.RemoveListener(Spin);
         }
 
+        // Demo 同时支持仅编号和奖励列表，所以只订阅 Completed，再读取已经保存的 WinReward。
+        // 正式业务配置了奖励时，可直接只订阅 RewardCompleted，见 README 的最小示例。
         private void OnCompleted(int index) {
+            if (m_Wheel.WinReward != null) {
+                OnRewardCompleted(m_Wheel.WinReward);
+                return;
+            }
+
             m_LastResult = $"Completed: sector {index}";
             RefreshUI();
         }
@@ -144,6 +156,7 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             RefreshUI();
         }
 
+        // 模拟结果晚到：先持续转动，点击“提交结果”后才锁定目标；取消不会走完成回调。
         public void BeginWaiting() {
             if (m_Wheel.BeginSpin()) {
                 m_LastResult = "Waiting for server result";
@@ -159,6 +172,7 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
 
         public void Cancel() => m_Wheel.CancelSpin();
 
+        // Demo 专属：不等分时画出真实扇形，并把奖励文字移到各格中心；不修改结果映射。
         private void LateUpdate() {
             RefreshUI();
 
@@ -166,7 +180,9 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
                 return;
             }
 
-            if (!m_Wheel.ValidateSectors(out _)) return;
+            if (!m_Wheel.ValidateSectors(out _)) {
+                return;
+            }
 
             if (m_Wheel.HasCustomSectors && !m_SectorsGraphic) {
                 m_SectorsGraphic =
@@ -183,10 +199,15 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
 
             if (m_SectorsGraphic) {
                 m_SectorsGraphic.gameObject.SetActive(m_Wheel.HasCustomSectors);
-                if (m_Wheel.HasCustomSectors) m_SectorsGraphic.SetLayout(m_Wheel, m_FirstSectorAngle);
+                
+                if (m_Wheel.HasCustomSectors) {
+                    m_SectorsGraphic.SetLayout(m_Wheel, m_FirstSectorAngle);
+                }
             }
 
-            if (m_ReelImage) m_ReelImage.enabled = m_ReelImageWasEnabled && !m_Wheel.HasCustomSectors;
+            if (m_ReelImage) {
+                m_ReelImage.enabled = m_ReelImageWasEnabled && !m_Wheel.HasCustomSectors;
+            }
 
             if (m_SectorLabels.Length < m_Wheel.SectorsCount) {
                 var previousCount = m_SectorLabels.Length;
@@ -216,8 +237,8 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
                 label.resizeTextMinSize = 12;
                 label.resizeTextMaxSize = 26;
                 label.raycastTarget = false;
-                var direction = m_Wheel.SectorDirection == SpinDirection.ClockWise ? 1 : -1;
-                var radians = (m_FirstSectorAngle + direction * m_Wheel.GetSectorCenterOffset(index)) * Mathf.Deg2Rad;
+                
+                var radians = (m_FirstSectorAngle + m_Wheel.GetSectorCenterOffset(index)) * Mathf.Deg2Rad;
                 label.rectTransform.anchoredPosition = new Vector2(Mathf.Sin(radians), Mathf.Cos(radians)) * radius;
 
                 // 编号随扇区移动，文字保持正向；不参与射线检测，不遮挡转盘按钮。
@@ -234,13 +255,15 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             m_DebugPanel.SetActive(m_ShowDebugPanel);
             m_StateLabel.text = $"State: {m_Wheel.State}";
             m_ResultLabel.text = m_LastResult;
+            
             var targetReward = m_Wheel.GetReward(m_TargetIndex);
             m_TargetLabel.text = targetReward == null ? $"Target: {m_TargetIndex} / {m_Wheel.SectorsCount - 1}"
                 : $"{m_TargetIndex}: {targetReward.Name}";
             m_DecreaseButton.interactable = m_TargetIndex > 0;
             m_IncreaseButton.interactable = m_TargetIndex < m_Wheel.SectorsCount - 1;
 
-            var canStart = m_Wheel.isActiveAndEnabled && !m_Wheel.IsSpinning && m_Wheel.ValidateSectors(out _);
+            var canStart = m_Wheel.isActiveAndEnabled && m_Wheel.Reel && !m_Wheel.IsSpinning
+                           && m_Wheel.ValidateSectors(out _) && m_Wheel.ValidateRewards(out _);
             m_SpinButton.interactable = canStart;
             m_CenterSpinButton.interactable = canStart;
             m_BeginWaitingButton.interactable = canStart;

@@ -168,33 +168,37 @@ MonoBehaviour:
   m_Reel: {fileID: 2016387334}
   m_PointerController: {fileID: 1622896530}
   m_SectorsCount: 6
+  m_CustomSectors: 0
+  m_SectorWidths:
+  - 30
+  - 60
+  - 60
+  - 90
+  - 60
+  - 60
+  m_LandingMode: 0
+  m_LandingOffset: 0
+  m_LandingRange: {x: -0.25, y: 0.25}
   m_Rewards:
-  - m_Id: sector_0
-    m_Name: Coins
+  - m_Name: Coins
     m_View: {fileID: 300000170}
     m_Data: {fileID: 0}
-  - m_Id: sector_1
-    m_Name: Gems
+  - m_Name: Gems
     m_View: {fileID: 300000180}
     m_Data: {fileID: 0}
-  - m_Id: sector_2
-    m_Name: Ticket
+  - m_Name: Ticket
     m_View: {fileID: 300000190}
     m_Data: {fileID: 0}
-  - m_Id: sector_3
-    m_Name: Bonus
+  - m_Name: Bonus
     m_View: {fileID: 300000200}
     m_Data: {fileID: 0}
-  - m_Id: sector_4
-    m_Name: Gift
+  - m_Name: Gift
     m_View: {fileID: 300000210}
     m_Data: {fileID: 0}
-  - m_Id: sector_5
-    m_Name: Try again
+  - m_Name: Try again
     m_View: {fileID: 300000220}
     m_Data: {fileID: 0}
   m_ZeroAngle: 0
-  m_SectorDirection: 1
   m_SpinDirection: 0
   m_MainRotationTime: 1
   m_MinimumTurns: 2
