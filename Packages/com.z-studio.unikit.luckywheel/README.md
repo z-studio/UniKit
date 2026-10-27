@@ -56,7 +56,7 @@ Inspector 的速度以“圈/秒”显示，例如 2 表示每秒两圈；运行
 
 ## 推荐的业务调用
 
-**统一按奖格索引起转，索引从 0 开始。** Inspector 配好后不需要再调用初始化或配置接口。配置了奖励列表时，可以只监听 `RewardCompleted` 获取奖励数据。下面是可以直接挂到物体上的最小示例，转到第 0 格：
+**统一按奖格索引起转，索引从 0 开始。** Inspector 配好后不需要再调用初始化或配置接口。完成时统一监听 `Completed(int)`，通过索引读取奖励配置。下面是可以直接挂到物体上的最小示例，转到第 0 格：
 
 ```csharp
 using UnityEngine;
@@ -66,8 +66,8 @@ public class MyWheel : MonoBehaviour {
     [SerializeField] 
     private WheelController wheel;
 
-    private void OnEnable() => wheel.RewardCompleted += OnRewardCompleted;
-    private void OnDisable() => wheel.RewardCompleted -= OnRewardCompleted;
+    private void OnEnable() => wheel.Completed += OnCompleted;
+    private void OnDisable() => wheel.Completed -= OnCompleted;
 
     // 可绑定到 UI 按钮。
     public void SpinFirstSector() {
@@ -76,18 +76,19 @@ public class MyWheel : MonoBehaviour {
         }
     }
 
-    private void OnRewardCompleted(WheelReward reward) {
-        Debug.Log($"已停准：{reward.Name}", this);
+    private void OnCompleted(int index) {
+        var reward = wheel.GetReward(index); // 未配置奖励列表时为 null。
+        Debug.Log($"已停准第 {index} 格：{reward?.Name}", this);
         // 在这里显示结果；实际奖励由业务规则或服务器确定。
     }
 }
 ```
 
-**需要结果索引：只监听 `Completed(int)`。** 无论有没有配置奖励列表，转到第 2 格都使用 `TryStartSpin(2)`。 编号从 0 开始。`StartSpin` 适用于无需返回值的简单调用；`TryStartSpin` 会告诉你这次操作是否被受理。非法编号会抛出异常。
+**完成通知统一返回奖格索引。** 无论有没有配置奖励列表，转到第 2 格都使用 `TryStartSpin(2)`。 编号从 0 开始。`StartSpin` 适用于无需返回值的简单调用；`TryStartSpin` 会告诉你这次操作是否被受理。非法编号会抛出异常。
 
 **结果稍后才返回：先 `BeginSpin()`，得到结果后再 `StopAt(index)`。** 这两次调用必须属于同一轮；失败、超时或退出界面时由业务方调用 `CancelSpin()`。结果只允许提交一次，取消不产生中奖通知。可以在“试转”用“开始转动，等待结果 → 提交选中奖格并停转”模拟这个过程。
 
-Inspector 中的停准事件、C# 事件和每次调用的 callback 都是完成通知，**同一份业务处理只选一个入口**。`RewardCompleted` 只在配置了奖励时触发。Inspector 中的“开始转动时”通知在操作受理时触发，可能还处在开始前等待阶段。
+Inspector 只保留一个“转动完成时（返回奖格索引）”，代码中对应 `Completed(int)`，无论是否配置奖励列表都触发。同一份业务处理选择 Inspector 绑定或代码订阅即可，避免重复处理；单次调用的 callback 可用于该次操作的后续逻辑。Inspector 中的“开始转动时”通知在操作受理时触发，可能还处在开始前等待阶段。
 
 ## 每格大小与格内停止位置
 
@@ -144,9 +145,9 @@ wheel.ConfigureRewards(new[] {
     new WheelReward("特殊奖励", view: secondView, userData: serverPrize)
 });
 
-wheel.RewardCompleted += result => {
-    // result.Name / View / Data / UserData 对应本轮锁定的格子。
-    ShowResult(result);
+wheel.Completed += index => {
+    var reward = wheel.GetReward(index);
+    ShowResult(reward);
 };
 
 wheel.TryStartSpin(1);
@@ -158,9 +159,9 @@ wheel.TryStartSpin(1);
 
 `ConfigureRewards` 只能在空闲时调用；先完整校验再替换，无效配置不会破坏原列表。它复制配置项，但 View、Data、UserData 仍是原对象引用，不深拷贝。静态字段可保存在场景/Prefab 中，UserData 仅存在于运行时。配置不会自动保存回场景。
 
-`GetReward(index)` 读取格子配置；同一索引用于 `TryStartSpin(index)` 和 `StopAt(index)`。`TargetReward` 是本轮已锁定的映射，`WinReward` 在完成后可读；取消不会发出奖励完成事件。完成事件传入本轮映射，即使其他完成监听器已经开始下一轮也不会串结果。仅按编号使用时奖励为 null。
+`GetReward(index)` 读取格子配置；同一索引用于 `TryStartSpin(index)` 和 `StopAt(index)`。`TargetReward` 是本轮已锁定的映射，`WinReward` 在完成后可读；取消不会发出完成事件。完成事件传入本轮索引；需要奖励配置时使用 `GetReward(index)`，应在发起下一轮或修改配置之前读取所需数据。仅按编号使用时奖励为 null。
 
-格数由奖励列表决定，已有奖励时 `Initialize` / `Configure` 不接受不同格数，请用 `ConfigureRewards` 整体更新。`ClearRewards()` 清除映射并保留当前格数，不销毁表现对象。选一种完成通知处理业务，避免编号通知与奖励通知重复发奖。
+格数由奖励列表决定，已有奖励时 `Initialize` / `Configure` 不接受不同格数，请用 `ConfigureRewards` 整体更新。`ClearRewards()` 清除映射并保留当前格数，不销毁表现对象。完成通知统一返回索引，奖励数据通过索引读取。
 
 ## 运行时配置
 
@@ -312,4 +313,4 @@ wheel.SnapToSector(0);              // 空闲时立即对齐，不触发完成�
 | 所有格都偏同样角度 | 用正确的奖格中心标记和指针位置重新对齐 |
 | 指针跟着圆盘转 | 将指针移到旋转圆盘外 |
 | 指针围绕奇怪的位置摆动 | 将轴心放在摆动支点，必要时用父物体作为支点、子物体放指针图片 |
-| 一次结果处理了多遍 | 是否同时绑定了多个停准事件、C# 事件或 callback |
+| 一次结果处理了多遍 | 是否同时通过 Inspector 和代码订阅处理了同一份业务，或又在 callback 中重复处理 |

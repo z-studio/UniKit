@@ -23,8 +23,7 @@ namespace ZStudio.UniKit.LuckyWheel.Editor {
                 "m_CustomOutRhythm", "m_OutRotationCurve"),
             new("Audio", "音效（可选）", false, "m_SpinSound", "m_HitTargetSound"),
             new("Events", "事件（可选）", false,
-                "m_StartedEvent", "m_ResultEvent", "m_RewardEvent", "m_CompleteEvent",
-                "m_CancelledEvent")
+                "m_StartedEvent", "m_ResultEvent", "m_CancelledEvent")
         };
 
         private sealed class InspectorGroup {
@@ -112,7 +111,7 @@ namespace ZStudio.UniKit.LuckyWheel.Editor {
                             "SpinIn" => "起转用时越短越利落，越长越轻柔。回拉角度设为 0，可关闭起转前的反向小摆动。",
                             "Motion" => "这里设置正常转动的速度和最短时间，起转、停转另计。为停准奖格，实际可能稍微多转一点。",
                             "SpinOut" => "停转用时越短越干脆，越长越缓慢。回摆角度设为 0，可直接停准，不做小幅回摆。",
-                            "Events" => "配置了奖励，推荐只使用“停准后（返回奖励）”；仅按编号使用时，选择“停准后（返回编号）”。多个停准事件都会触发，同一份业务处理只绑定一个入口。",
+                            "Events" => "“转动完成时”在圆盘停准、回摆结束后触发，返回奖格索引。需要奖励配置时，用这个索引调用 GetReward。取消转动只触发“取消时”。",
                             _ => null
                         };
                         
@@ -381,9 +380,7 @@ namespace ZStudio.UniKit.LuckyWheel.Editor {
                 "m_SpinSound" => ("转动音效", "转动期间循环播放；取消或停准后停止。"),
                 "m_HitTargetSound" => ("停准音效", "最终停准目标奖格后播放一次。"),
                 "m_StartedEvent" => ("开始转动时", "接受新一轮转动后触发。"),
-                "m_ResultEvent" => ("停准后（返回编号）", "整个表现结束后触发，传入本次目标奖格的编号。"),
-                "m_RewardEvent" => ("停准后（返回奖励）", "已配置奖励时触发，返回本轮锁定的映射（对象数据仍为引用）。选择一种完成通知处理业务，避免重复发奖。"),
-                "m_CompleteEvent" => ("停准后", "整个表现结束后触发，不带参数。"),
+                "m_ResultEvent" => ("转动完成时（返回奖格索引）", "整个表现结束后触发，传入本次目标奖格索引。代码可用 GetReward(index) 获取奖励配置；取消时不触发。"),
                 "m_CancelledEvent" => ("取消时", "活动中的转动被取消时触发，不会触发停准事件。"),
                 "m_SpinStartDelay" => ("开始前等待（秒）", "发起转动后，先等待多久再开始动作。"),
                 "m_UseUnscaledTime" => ("游戏暂停时仍转动", "开启后忽略 Time.timeScale，也会让指针使用相同时间设置。"),

@@ -116,20 +116,11 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             m_CenterSpinButton.onClick.RemoveListener(Spin);
         }
 
-        // Demo 同时支持仅编号和奖励列表，所以只订阅 Completed，再读取已经保存的 WinReward。
-        // 正式业务配置了奖励时，可直接只订阅 RewardCompleted，见 README 的最小示例。
+        // 完成通知统一返回索引；是否配置奖励列表都使用相同入口。
         private void OnCompleted(int index) {
-            if (m_Wheel.WinReward != null) {
-                OnRewardCompleted(m_Wheel.WinReward);
-                return;
-            }
-
-            m_LastResult = $"Completed: sector {index}";
-            RefreshUI();
-        }
-
-        private void OnRewardCompleted(WheelReward reward) {
-            m_LastResult = $"Completed: {reward.Name}";
+            var reward = m_Wheel.GetReward(index);
+            m_LastResult = reward == null || string.IsNullOrWhiteSpace(reward.Name)
+                ? $"Completed: sector {index}" : $"Completed: {reward.Name}";
             RefreshUI();
         }
 

@@ -158,12 +158,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         private UnityEvent<int> m_ResultEvent = new();
 
         [SerializeField]
-        private UnityEvent<WheelReward> m_RewardEvent = new();
-
-        [SerializeField]
-        private UnityEvent m_CompleteEvent = new();
-
-        [SerializeField]
         private UnityEvent m_CancelledEvent = new();
 
         // 对外状态区：Target 是本轮已锁定的目标；Win 只在完整停准后成立，-1 表示无结果。
@@ -188,12 +182,11 @@ namespace ZStudio.UniKit.LuckyWheel {
         public WheelReward TargetReward { get; private set; }
         public WheelReward WinReward { get; private set; }
 
-        /// <summary>本轮表现完成时返回锁定的映射副本；表现对象与业务数据仍为引用。</summary>
-        public event Action<WheelReward> RewardCompleted;
-
         public float ZeroAngle => m_ZeroAngle;
         public Transform Reel => m_Reel;
         public bool UseUnscaledTime => m_UseUnscaledTime;
+
+        /// <summary>整轮表现完成后返回奖格索引；需要奖励配置时使用 GetReward(index)。取消不触发。</summary>
         public event Action<int> Completed;
         public event Action Cancelled;
 
@@ -1031,13 +1024,7 @@ namespace ZStudio.UniKit.LuckyWheel {
 
             // 所有状态和资源先收尾，回调内可安全发起下一轮。结果参数属于本次完成，不读取下一轮状态。
             m_ResultEvent.Invoke(result);
-            m_CompleteEvent.Invoke();
             Completed?.Invoke(result);
-
-            if (reward != null) {
-                m_RewardEvent.Invoke(reward);
-                RewardCompleted?.Invoke(reward);
-            }
 
             callback?.Invoke();
         }

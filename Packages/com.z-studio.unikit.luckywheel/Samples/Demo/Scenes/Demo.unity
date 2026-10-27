@@ -319,12 +319,6 @@ MonoBehaviour:
   m_ResultEvent:
     m_PersistentCalls:
       m_Calls: []
-  m_RewardEvent:
-    m_PersistentCalls:
-      m_Calls: []
-  m_CompleteEvent:
-    m_PersistentCalls:
-      m_Calls: []
   m_CancelledEvent:
     m_PersistentCalls:
       m_Calls: []
