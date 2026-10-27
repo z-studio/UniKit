@@ -63,15 +63,17 @@ using UnityEngine;
 using ZStudio.UniKit.LuckyWheel;
 
 public class MyWheel : MonoBehaviour {
-    [SerializeField] private WheelController wheel;
+    [SerializeField] 
+    private WheelController wheel;
 
     private void OnEnable() => wheel.RewardCompleted += OnRewardCompleted;
     private void OnDisable() => wheel.RewardCompleted -= OnRewardCompleted;
 
     // 可绑定到 UI 按钮。
     public void SpinFirstSector() {
-        if (!wheel.TryStartSpin(0))
+        if (!wheel.TryStartSpin(0)) {
             Debug.Log("未开始：请检查圆盘配置、组件是否启用，以及是否正在转动。", this);
+        }
     }
 
     private void OnRewardCompleted(WheelReward reward) {
@@ -99,14 +101,18 @@ Inspector 中的停准事件、C# 事件和每次调用的 callback 都是完成
 ```csharp
 // 先配置 Reel 和奖励。没有奖励映射时，宽度列表会同时确定格数。
 wheel.ConfigureSectorWidths(new[] { 20f, 70f, 110f, 160f });
+
 // 运行时 offset = 格内百分比 / 100 - 0.5；0 是中心。
 wheel.ConfigureLanding(WheelLandingMode.Fixed, offset: 0.3f); // 80% 处
 wheel.StartSpin(1);
+
 // 空闲后可改为格内 20%～70% 随机：
 wheel.ConfigureLanding(WheelLandingMode.Random,
     randomRange: new Vector2(-0.3f, 0.2f));
+
 // 单次调用的显式位置覆盖默认落点设置：
 wheel.TryStartSpin(1, offset: -0.2f); // 30% 处
+
 // 等待模式对应 StopAt(index, offset)。
 // 立即设置初始姿态也可不居中，不触发奖励事件：
 wheel.SnapToSector(1, offset: 0.1f);
@@ -137,10 +143,12 @@ wheel.ConfigureRewards(new[] {
     new WheelReward("金币格", view: firstView, data: firstPrizeAsset),
     new WheelReward("特殊奖励", view: secondView, userData: serverPrize)
 });
+
 wheel.RewardCompleted += result => {
     // result.Name / View / Data / UserData 对应本轮锁定的格子。
     ShowResult(result);
 };
+
 wheel.TryStartSpin(1);
 
 // 等待异步结果时：
@@ -167,6 +175,7 @@ wheel.ConfigureMotion(duration: 3f, minimumTurns: 3,
 
 // 减速时间单独配置；不传曲线，使用自然节奏。
 wheel.ConfigureRhythm(decelerationTime: 1.8f);
+
 // 可选的轻微预摆和回摆；角度或时长为 0 时关闭。
 wheel.ConfigureStages(inDuration: 0.2f, inAngle: 3,
                       outDuration: 0.3f, outAngle: 2);
@@ -219,15 +228,21 @@ wheel.ConfigureRhythm(1.8f,
 ## 等待服务器结果
 
 ```csharp
-if (!wheel.BeginSpin()) return;
+if (!wheel.BeginSpin()) {
+    return;
+}
+
 try {
     var result = await RequestResultAsync();
     // 异步返回后仍需确认这是当前请求，并且转盘仍属于本轮。
     // 生命周期变化、取消、超时和请求编号由调用方管理。
-    if (thisRequestIsCurrent && wheel && wheel.CanSubmitResult)
+    if (thisRequestIsCurrent && wheel && wheel.CanSubmitResult) {
         wheel.StopAt(result.sectorIndex);
+    }
 } catch {
-    if (thisRequestIsCurrent && wheel) wheel.CancelSpin();
+    if (thisRequestIsCurrent && wheel) {
+        wheel.CancelSpin();
+    }
 }
 ```
 
