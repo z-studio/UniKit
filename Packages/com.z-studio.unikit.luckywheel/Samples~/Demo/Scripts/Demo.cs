@@ -5,14 +5,11 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
     /// <summary>
     /// 可直接运行的 UGUI 示例：按钮指定结果，转盘组件只播放表现。
     /// 阅读顺序：OnEnable 绑定交互 → Spin / BeginWaiting / SubmitResult 发起操作 → OnCompleted 显示结果。
-    /// LateUpdate 里的底图生成和文字排布仅用于演示不同格数，不是业务接入必需步骤。
+    /// RefreshSectorLayout 里的底图生成和文字排布仅用于演示不同布局，不是业务接入必需步骤。
     /// </summary>
     public class Demo : MonoBehaviour {
         [SerializeField]
         private WheelController m_Wheel;
-
-        [Min(1), SerializeField]
-        private int m_SectorsCount = 6;
 
         [SerializeField]
         private int m_TargetIndex;
@@ -68,8 +65,10 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
         private string m_LastResult = "No result";
 
         private void Start() {
-            if (!m_Wheel.HasRewards && !m_Wheel.HasCustomSectors) {
-                m_Wheel.Initialize(m_SectorsCount);
+            if (!m_Wheel || !m_Wheel.Reel) {
+                Debug.LogError("LuckyWheel Demo: assign a wheel with a Reel before running the sample.", this);
+                enabled = false;
+                return;
             }
 
             m_ReelImage = m_Wheel.Reel.GetComponent<Image>();
@@ -121,30 +120,24 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             var reward = m_Wheel.GetReward(index);
             m_LastResult = reward == null || string.IsNullOrWhiteSpace(reward.Name)
                 ? $"Completed: sector {index}" : $"Completed: {reward.Name}";
-            RefreshUI();
         }
 
         private void OnCancelled() {
             m_LastResult = "Cancelled (no result)";
-            RefreshUI();
         }
 
         private void DecreaseTarget() {
             m_TargetIndex--;
-            RefreshUI();
         }
 
         private void IncreaseTarget() {
             m_TargetIndex++;
-            RefreshUI();
         }
 
         public void Spin() {
             if (m_Wheel.TryStartSpin(m_TargetIndex)) {
                 m_LastResult = "Waiting for completion";
             }
-
-            RefreshUI();
         }
 
         // 模拟结果晚到：先持续转动，点击“提交结果”后才锁定目标；取消不会走完成回调。
@@ -152,21 +145,25 @@ namespace ZStudio.UniKit.LuckyWheel.Samples {
             if (m_Wheel.BeginSpin()) {
                 m_LastResult = "Waiting for server result";
             }
-
-            RefreshUI();
         }
 
         public void SubmitResult() {
             m_Wheel.StopAt(m_TargetIndex);
-            RefreshUI();
         }
 
         public void Cancel() => m_Wheel.CancelSpin();
 
-        // Demo 专属：不等分时画出真实扇形，并把奖励文字移到各格中心；不修改结果映射。
+        // 交互只修改数据，在帧末统一刷新面板和布局，避免每个按钮、回调重复刷新。
         private void LateUpdate() {
-            RefreshUI();
+            if (!m_Wheel) {
+                return;
+            }
 
+            RefreshUI();
+            RefreshSectorLayout();
+        }
+
+        private void RefreshSectorLayout() {
             if (m_Wheel.Reel is not RectTransform reel || m_SectorLabels == null || m_SectorLabels.Length == 0) {
                 return;
             }

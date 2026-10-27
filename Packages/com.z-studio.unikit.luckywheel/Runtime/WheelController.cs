@@ -193,7 +193,6 @@ namespace ZStudio.UniKit.LuckyWheel {
         // 本轮运动数据：内部角度不按 360° 归零，用于累计圈数和检测跨格。
         // 只有写入 Transform 时取余；使用 double 降低多圈累计的精度损失。
         private AudioSource m_AudioSource;
-        private Action m_OnComplete;
         private float m_DelayRemaining;
         private double m_Elapsed;
         private float m_Speed;
@@ -273,17 +272,6 @@ namespace ZStudio.UniKit.LuckyWheel {
             m_ZeroAngle = zeroAngle;
             WinSectorIndex = -1;
             TargetSectorIndex = -1;
-            TargetReward = WinReward = null;
-        }
-
-        /// <summary>Inspector 已配置布局时无需调用；此方法供运行时更新扇区数量。</summary>
-        public void Initialize(int sectorsCount) {
-            RequireIdle();
-            ValidateLayout(sectorsCount, m_ZeroAngle);
-            RequireMatchingRewardCount(sectorsCount);
-            RequireMatchingSectorCount(sectorsCount);
-            m_SectorsCount = sectorsCount;
-            WinSectorIndex = TargetSectorIndex = -1;
             TargetReward = WinReward = null;
         }
 
@@ -505,10 +493,10 @@ namespace ZStudio.UniKit.LuckyWheel {
                 _ => 0
             };
 
-        /// <summary>配置最少匀速时间、整轮最少圈数、稳定转速和加速时间。旋转中不允许修改。</summary>
+        /// <summary>配置匀速时间、圈数、方向和转速，不修改格内停止位置。落点由 ConfigureLanding 单独设置。</summary>
         public void ConfigureMotion(float duration, int minimumTurns, SpinDirection direction,
             float waitingSpeed = 720, float accelerationTime = 0.4f,
-            float startDelay = 0, float landingJitter = 0, bool useUnscaledTime = false) {
+            float startDelay = 0, bool useUnscaledTime = false) {
             RequireIdle();
 
             if (!IsFinite(duration) || duration < 0) {
@@ -531,18 +519,12 @@ namespace ZStudio.UniKit.LuckyWheel {
                 throw new ArgumentOutOfRangeException(nameof(startDelay));
             }
 
-            if (!IsFinite(landingJitter) || landingJitter < 0 || landingJitter > 0.49f) {
-                throw new ArgumentOutOfRangeException(nameof(landingJitter));
-            }
-
             m_MainRotationTime = duration;
             m_MinimumTurns = minimumTurns;
             m_SpinDirection = direction;
             m_WaitingSpeed = waitingSpeed;
             m_AccelerationTime = accelerationTime;
             m_SpinStartDelay = startDelay;
-            ConfigureLanding(landingJitter > 0 ? WheelLandingMode.Random : WheelLandingMode.Center,
-                randomRange: new Vector2(-landingJitter, landingJitter));
             m_UseUnscaledTime = useUnscaledTime;
         }
 
@@ -623,7 +605,7 @@ namespace ZStudio.UniKit.LuckyWheel {
 
         private void RequireIdle() {
             if (IsSpinning) {
-                throw new InvalidOperationException("Cancel the current spin before changing the layout.");
+                throw new InvalidOperationException("Cancel the current spin before changing wheel configuration.");
             }
         }
 
@@ -655,34 +637,29 @@ namespace ZStudio.UniKit.LuckyWheel {
         public bool SnapToSector(int sectorIndex) => SnapToSector(sectorIndex, 0);
 
         public bool SnapToSector(int sectorIndex, float offset) {
-            var angle = GetSectorAngle(sectorIndex, offset);
-
             if (IsSpinning || !m_Reel) {
                 return false;
             }
 
+            var angle = GetSectorAngle(sectorIndex, offset);
             ApplyAngle(angle, false);
             WinSectorIndex = TargetSectorIndex = -1;
             TargetReward = WinReward = null;
             return true;
         }
 
-        /// <summary>按编号发起转动。无需返回值时可用；业务通常用 TryStartSpin 检查是否成功受理。</summary>
-        public void StartSpin(int winSectorIndex, Action onComplete = null) => TryStartSpin(winSectorIndex, onComplete);
-
         /// <summary>编号模式入口。返回 false 表示忙碌、组件未启用或配置不可用；非法编号会抛出异常。</summary>
-        public bool TryStartSpin(int winSectorIndex, Action onComplete = null) =>
-            TryStartSpin(winSectorIndex, DefaultLandingOffset(), onComplete);
+        public bool TryStartSpin(int winSectorIndex) =>
+            TryStartSpin(winSectorIndex, DefaultLandingOffset());
 
-        public bool TryStartSpin(int winSectorIndex, float offset, Action onComplete = null) {
-            var angle = GetSectorAngle(winSectorIndex, offset);
-
+        public bool TryStartSpin(int winSectorIndex, float offset) {
             if (!CanStart()) {
                 return false;
             }
 
+            var angle = GetSectorAngle(winSectorIndex, offset);
             PrepareSpin();
-            LockResult(winSectorIndex, angle, onComplete);
+            LockResult(winSectorIndex, angle);
             BeginMotion();
             m_StartedEvent.Invoke();
             return true;
@@ -700,18 +677,17 @@ namespace ZStudio.UniKit.LuckyWheel {
             return true;
         }
 
-        public bool StopAt(int sectorIndex, Action onComplete = null) =>
-            StopAt(sectorIndex, DefaultLandingOffset(), onComplete);
+        public bool StopAt(int sectorIndex) =>
+            StopAt(sectorIndex, DefaultLandingOffset());
 
         /// <summary>等待模式指定结果。显式 offset 可用于可复现测试；结果一旦锁定，不接受第二次停止请求。</summary>
-        public bool StopAt(int sectorIndex, float offset, Action onComplete = null) {
-            var angle = GetSectorAngle(sectorIndex, offset);
-
+        public bool StopAt(int sectorIndex, float offset) {
             if (!CanSubmitResult) {
                 return false;
             }
 
-            LockResult(sectorIndex, angle, onComplete);
+            var angle = GetSectorAngle(sectorIndex, offset);
+            LockResult(sectorIndex, angle);
 
             if (State == WheelState.Spinning) {
                 PlanMainStop();
@@ -775,11 +751,10 @@ namespace ZStudio.UniKit.LuckyWheel {
         }
 
         // 保存本轮快照：后续播放和通知使用同一份结果，不从外部配置重新读取奖励。
-        private void LockResult(int target, float angle, Action callback) {
+        private void LockResult(int target, float angle) {
             TargetSectorIndex = target;
             TargetReward = GetReward(target)?.Copy();
             m_LandingAngle = angle;
-            m_OnComplete = callback;
         }
 
         private void BeginMotion() {
@@ -1005,8 +980,6 @@ namespace ZStudio.UniKit.LuckyWheel {
             ApplyAngle(m_LandingAngle, false);
             var result = TargetSectorIndex;
             var reward = TargetReward;
-            var callback = m_OnComplete;
-            m_OnComplete = null;
             State = WheelState.Idle;
             m_Speed = 0;
             WinSectorIndex = result;
@@ -1026,15 +999,13 @@ namespace ZStudio.UniKit.LuckyWheel {
             m_ResultEvent.Invoke(result);
             Completed?.Invoke(result);
 
-            callback?.Invoke();
         }
 
-        /// <summary>保留当前转盘角度，停止声音并恢复指针；丢弃完成回调，不产生中奖结果。</summary>
+        /// <summary>保留当前转盘角度，停止声音并恢复指针，不触发完成事件。</summary>
         public void CancelSpin() {
             var wasSpinning = IsSpinning;
             State = WheelState.Idle;
             m_Speed = 0;
-            m_OnComplete = null;
             TargetSectorIndex = -1;
             TargetReward = null;
 

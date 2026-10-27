@@ -2881,7 +2881,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   m_Wheel: {fileID: 4199464}
-  m_SectorsCount: 6
   m_TargetIndex: 0
   m_ShowDebugPanel: 1
   m_ShowSectorNumbers: 1
