@@ -210,7 +210,9 @@ wheel.ConfigureStages(inDuration: 0.2f, inAngle: 3,
 
 ## 5. Demo 与源码阅读
 
-打开 `Samples/Demo/Scenes/Demo.unity`，进入运行模式。顶部面板支持选择索引、直接转动、开始等待、提交结果和取消。Inspector 的“试转”还支持单次格内位置与调试随机目标；业务结果不会自动随机。
+在 Unity 的 **Window → Package Manager** 中选择 **Lucky Wheel**，展开 **Samples**，点击 **Demo → Import**。导入后，打开 `Assets/Samples/Lucky Wheel/<包版本>/Demo/Scenes/Demo.unity`，进入运行模式。包内的 `Samples~/Demo` 是示例源目录，应先导入再使用。
+
+顶部面板支持选择索引、直接转动、开始等待、提交结果和取消。Inspector 的“试转”还支持单次格内位置与调试随机目标；业务结果不会自动随机。
 
 Demo 的格数直接使用转盘配置，不另设一份。它为不等分布局生成底图并排布文字，仅用于核对索引与扇形；正式游戏的美术排布由业务维护。运行界面的英文标签使用场景自带字体，Inspector 配置为中文。
 
