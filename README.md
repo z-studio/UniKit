@@ -14,7 +14,7 @@ UniKit 是 Z Studio 持续维护的 Unity 工具与组件集合，收集可复�
 | [UI Marquee](Packages/com.z-studio.unikit.ui.marquee/README.md) | 公告与跑马灯，支持图文混排、逐条轮播、连续滚动及可选 Spine 片段 | `com.z-studio.unikit.ui.marquee` |
 | [UI Safe Area](Packages/com.z-studio.unikit.ui.safearea/README.md) | UI 安全区适配，支持逐边留白、居中，以及子元素向非安全区外扩或平移 | `com.z-studio.unikit.ui.safearea` |
 | [Camera Scaler](Packages/com.z-studio.unikit.camera-scaler/README.md) | 根据参考分辨率与屏幕比例适配正交相机可视范围或透视相机视野角 | `com.z-studio.unikit.camera-scaler` |
-| [UI Card Curl（咪牌）](Packages/com.z-studio.unikit.ui.card-curl/README.md) | 基于 CurlEffect 的 UGUI 四角/四边咪牌，支持旋转及父级缩放，包含遮罩、阴影和翻牌动画 | `com.z-studio.unikit.ui.card-curl` |
+| [UI Card Curl（咪牌）](Packages/com.z-studio.unikit.ui.card-curl/README.md) | UGUI 四角/四边咪牌，支持旋转及父级缩放，包含遮罩、阴影和翻牌动画 | `com.z-studio.unikit.ui.card-curl` |
 
 ### 编辑器工具
 

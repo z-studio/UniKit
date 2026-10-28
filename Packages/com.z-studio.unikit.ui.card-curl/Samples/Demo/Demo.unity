@@ -3795,7 +3795,7 @@ MonoBehaviour:
   m_Text: 'Drag a corner or edge, then release to flip or return.
 
     Auto-flip
-    buttons demonstrate each direction.
+    buttons follow screen directions.
 
     Set Flip Threshold to 0 in the Inspector
     to enable click-to-flip.'

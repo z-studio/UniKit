@@ -1,17 +1,59 @@
 # UI Card Curl
 
-基于提供的 CurlEffect 整理的 UGUI 咪牌包，保留原来的正反面、旋转遮罩与折线阴影。支持四角和四边拖动、回弹、自动翻牌与提示动画。本版重点修复牌自身旋转、父级旋转/非等比缩放，以及交互或动画过程中旋转导致的错位。
+`CardCurl` 是一个用于 Unity UI 的咪牌组件。玩家可以拖动牌的四角或四边，松手后根据拖动进度翻开或回弹。组件也提供自动翻牌、操作提示和翻牌完成事件。
 
-## 使用
+## 先运行示例
 
-Unity 6、UGUI 2.0。核心包不依赖 URP、RenderTexture 或第三方 Tween，可直接放进现有 Canvas。
+1. 使用 Unity 6，并安装 UGUI、Input System 和 URP。示例场景使用 Input System UI 输入模块和 URP 相机。
+2. 在 **Project Settings → Player → Active Input Handling** 中启用 Input System；修改后按 Unity 提示重启编辑器。
+3. 打开包内的 `Samples/Demo/Demo.unity`，进入 Play Mode。
+4. 从牌的四角或四边向内拖动，然后松手。牌的中心区域不响应操作。
 
-1. 在 Canvas 下放入 `Res/CardCurl.prefab`，或选中 Canvas 内父节点执行 **Tools → UniKit → UI Card Curl → Create UI Card**。
-2. 在组件 Inspector 指定 Front Image / Back Image，或调用 SetFrontImage / SetBackImage。预制体提供参考素材默认值。
-3. 保留预制体中的 Mask → Back → Front → Shadow 层级，只绑定这四个引用。八方向的起点与命中区直接从根 RectTransform 计算，不再需要 Anchor / DragArea 物体。
-4. 项目继续使用已有的 EventSystem 与输入模块。
+| 示例操作 | 作用 |
+| --- | --- |
+| Rotate -30° / Rotate +30° | 旋转牌，观察不同角度下的拖动和翻牌 |
+| Angle 0° | 只恢复旋转角度 |
+| Reset | 重新盖牌、角度归零，并清零示例的累计完成次数 |
+| Hint | 重新盖牌，演示一次边角拖动提示 |
+| 四角、四边按钮 | 重新盖牌，再从屏幕上对应的角或边自动翻开 |
 
-下面是一个最小接入脚本。把它挂到场景物体上，在 Inspector 将牌拖到 `Card` 字段，然后将业务按钮分别绑定到 `Reveal`、`ResetCard`、`ShowHint`。这三个方法由不同操作触发，不要在同一帧依次调用。
+Hint 和自动翻牌按钮会先重置牌，方便重复体验。它们的方向以屏幕为准：例如牌旋转 90° 后，Left edge 仍选择位于屏幕左侧的牌边。斜向放置时，边按钮选择朝向最接近的边，角按钮选择最接近的角。实际业务中是否重置，由调用方决定。
+
+## 放入自己的场景
+
+组件需要 **Unity 6 和 UGUI 2.0**。
+
+1. 准备一个 Canvas，确认它带有 **Graphic Raycaster**。
+2. 确认场景中有 **EventSystem**，并使用与项目输入设置对应的 UI 输入模块。
+3. 将 `Res/CardCurl.prefab` 拖到 Canvas 下。也可以选中 Canvas 内的父节点，执行 **Tools → UniKit → UI Card Curl → Create UI Card**。
+4. 在 CardCurl 组件上设置 **Front Image**（牌面）和 **Back Image**（牌背）。图片应导入为 **Sprite (2D and UI)**。
+5. 调整牌根节点的 RectTransform 尺寸和位置，进入 Play Mode 后拖动牌的边角。
+
+使用 Screen Space - Camera 或 World Space Canvas 时，请给 Canvas 指定用于 UI 交互的相机。
+
+预制体内部的 `Mask → Back → Front → Shadow` 用于显示折页与阴影。接入时保留这些层级和组件引用，日常调整集中在牌根节点和 CardCurl 参数上。
+
+## 常用参数
+
+| Inspector 参数 | 含义 |
+| --- | --- |
+| Front Image / Back Image | 牌面、牌背的 Sprite |
+| Flip Threshold | 松手时需要达到的翻牌进度，范围 0～1；数值越大，需要拖动越远 |
+| Only Once | 开启后，每次盖牌只允许完成一次翻牌；再次操作前调用 Reset |
+| Flip Time / Flip Ease | 自动翻牌各阶段的时长和缓动方式 |
+| Recovery Time / Recovery Ease | 未达到翻牌进度时，回弹的时长和缓动方式 |
+| Starting Drag Area Tips | 场景开始时演示提示的位置；None 表示不自动提示 |
+| Tips Ratio | 提示距离占该方向跨度的比例，默认 0.15，范围 0～0.25；0 表示不播放提示 |
+| Tips Time / Tips Ease | 提示每段运动的时长和缓动方式 |
+| On Flip Complete | 翻牌完成时触发的事件 |
+
+**希望点击就翻牌时，将 Flip Threshold 设为 0。** 点击仍需落在四角或四边，中心区域不响应。
+
+动画使用不受 `Time.timeScale` 影响的时间；即使游戏时间暂停，提示、回弹和翻牌仍会播放。
+
+## 用代码控制
+
+将下面的脚本保存为 `CardCurlExample.cs`，挂到场景物体上，把牌拖到 Inspector 的 **Card** 字段。然后将三个按钮的 **On Click** 分别绑定到 `Reveal`、`ResetCard` 和 `ShowHint`。
 
 ```csharp
 using UnityEngine;
@@ -20,12 +62,21 @@ using ZStudio.UniKit.UI;
 public sealed class CardCurlExample : MonoBehaviour {
     [SerializeField] private CardCurl card;
 
+    private void Awake() {
+        if (!card) {
+            Debug.LogError("请在 Inspector 的 Card 字段绑定 CardCurl。", this);
+            enabled = false;
+        }
+    }
+
     private void OnEnable() {
         card.onFlipComplete.AddListener(OnFlipCompleted);
     }
 
     private void OnDisable() {
-        card.onFlipComplete.RemoveListener(OnFlipCompleted);
+        if (card) {
+            card.onFlipComplete.RemoveListener(OnFlipCompleted);
+        }
     }
 
     public void Reveal() {
@@ -48,55 +99,53 @@ public sealed class CardCurlExample : MonoBehaviour {
 }
 ```
 
-换图时调用 `card.SetImages(faceSprite, backSprite)`，它会同时设置正反面并重新盖牌。`Only Once` 默认开启，翻开后需调用 `ResetCard` 才能再次翻牌或提示。只有 `Flip Threshold` 设为 0 时允许点击热点翻牌，否则需要拖动；中心区域不响应。
+这三个方法由不同按钮触发。不要在同一帧依次调用“翻牌 → 重置 → 提示”，因为重置会停止刚启动的翻牌。
 
-`SetFrontImage`、`SetBackImage` 和 `Reset` 会停止当前动画、清除指针并重新盖牌；同时换两面时可用 `SetImages(front, back)`。它们不会改变根节点尺寸和锚点，正反面统一使用根节点尺寸。`Flip` 播放指定方向的翻牌；`ShowDragTips` 使用传入方向。Tips Ratio 为该方向跨度的比例：四角按对角线、四边按宽或高计算，默认 0.15，上限 0.25；设为 0 时不播放提示。`Only Once` 默认开启，完成后需要 Reset 才能再次交互。完成事件在旧动作结束和终态写入之后派发，回调内可以立即 Reset 或换图。
+`DragArea` 表示牌自身的四角或四边，随牌一起旋转。例如 `DragArea.Left` 始终指牌本地坐标中的左边。调用 `Flip`、`TryFlip`、`ShowDragTips` 和 `TryShowDragTips` 时，都使用这个方向约定。
 
-拖动只有一个捕获指针。轻触松手同样释放捕获，第二根手指不会改动第一根手指的状态。回弹、提示和翻牌均插值根节点局部位置，使用 unscaledDeltaTime；修改父节点位置、旋转或缩放不会把动画终点留在旧世界位置。
+### 换牌与查询状态
 
-交互中心区域不拦截射线；四角和四边沿用原来的 30% 命中区。根节点尺寸变化时，未提交的拖动/提示会取消，已经提交的翻牌重映射到新布局后继续完成。动画数据在 LateUpdate 统一推进，每帧只提交一次几何；静止时只检查根节点尺寸和变换是否变化。
+| 成员 | 用途 |
+| --- | --- |
+| `SetImages(front, back)` | 同时设置牌面和牌背，并重新盖牌 |
+| `SetFrontImage(sprite)` / `SetBackImage(sprite)` | 设置其中一面，并重新盖牌 |
+| `Reset()` | 停止当前操作、清除翻牌次数并重新盖牌；保留牌的尺寸、位置和旋转 |
+| `Flip(area)` / `ShowDragTips(area)` | 播放自动翻牌或提示，可用于不需要返回值的调用 |
+| `TryFlip(area)` / `TryShowDragTips(area)` | 返回是否成功启动动作；true 表示已启动，完成通知由事件提供 |
+| `IsBusy` | 是否正在拖动、回弹、提示或翻牌 |
+| `IsInteractable` | 是否可以接受新的指针交互 |
+| `FlipCompletedCount` | 自上次重置或换图以来，完成的翻牌次数 |
 
-Inspector 会显示具体缺失引用、组件或内部层级错误。编辑器预览更新由自定义 Inspector 在主线程执行，OnValidate 只处理数据校验。
+提示和回弹可以被新的拖动打断，因此 `IsBusy` 和 `IsInteractable` 可能同时为 true。已经开始的自动翻牌会拒绝新的翻牌请求。`TryShowDragTips` 在拖动中也会返回 false。
 
-## 旋转修复
+开启 Only Once 并完成翻牌、组件被禁用、方向为 None 或正在翻牌时，动作请求可能被拒绝。Tips Ratio 为 0 时也不会启动提示。
 
-原版把世界 XY 当成牌的方向，又每帧把 Back / Front 旋转设回世界零度，旋转后会出现方向判断、遮罩和图片不一致。
+## 了解示例结构
 
-当前实现以 CardCurl 根节点为唯一计算坐标系：
+- `Canvas / Demo controls`：标题、操作说明、状态文字和三行按钮。按钮的 On Click 已在 Inspector 中配置，可以直接查看绑定的方法。
+- `Canvas / Card area / Rotation space / CardCurl`：牌的显示区域。布局组件负责为面板和牌分配空间，锚点控制牌的比例，并为旋转留出余量。
+- `Demo / CurlDemo`：示例操作脚本。阅读顺序为事件订阅、按钮操作、完成回调、界面刷新。它不负责牌的拖动计算或动画推进。
 
-- 指针射线与实际变换后的牌平面相交，再通过完整逆矩阵转到局部坐标。父级非等比缩放叠加 X/Y 倾斜时，平面法线由两条变换后的切线计算。
-- 拖动方向、角度、距离、阈值与动画端点均在同一局部空间计算。
-- 先放置 Mask，再补偿 Back，最后提交 Front 和 Shadow，避免嵌套父节点变换使图片漂移。
-- 不使用世界位置零向量作为“是否初始化”的标记，也不依赖 Start 才允许业务调用 Reset / 换图。
+示例标题中的 Completed 是累计演示次数，按 Reset 后清零；组件的 `FlipCompletedCount` 则会在每次重置或换图时清零。
 
-遮罩仍采用原版二维折页效果。旋转到完全侧向、投影面积为零或父级缩放为零时不能进行有效指针投影。
+## 常见问题
 
-## 动作结果与交互状态
+**拖动没有反应**
 
-`Flip` / `ShowDragTips` 保留 void 签名，可绑定 UnityEvent。代码需要确认动作是否启动时，使用 `TryFlip(area)` / `TryShowDragTips(area)`：返回 true 表示已启动，false 表示方向无效、组件不可用或当前状态不接受该动作；提示幅度为零时也返回 false。失败不会中断已有动作。
+检查 EventSystem、UI 输入模块、Canvas 的 Graphic Raycaster，以及牌根节点 Image 的 Raycast Target。确认 CardCurl 已启用、没有其他 UI 挡在牌前面，并从四角或四边开始拖动。
 
-- `IsBusy`：正在拖动、回弹、提示或翻牌。
-- `IsInteractable`：当前可以接受指针交互。提示和回弹允许被新的拖动打断，所以 IsBusy 与 IsInteractable 可以同时为 true；提示方法在拖动中返回 false。
-- `FlipCompletedCount`：自上次 Reset 或换图以来完成的翻牌次数。
+**翻开一次后不能继续操作**
 
-Flip Threshold 为 0 时，允许在四角或四边热点轻触松手翻牌，中心区域仍不响应；大于 0 时要求达到对应拖动进度。Only Once、指针捕获和完成事件规则与拖动翻牌相同。
+Only Once 已开启。调用 Reset 重新盖牌，或关闭 Only Once 允许连续翻牌。
 
-## Demo
+**提示没有出现**
 
-当前开发阶段直接打开包内 `Samples/Demo/Demo.unity`，无需导入到 Assets。示例脚本会随工程编译，接下来的示例修改以该目录为准。
+确认 Tips Ratio 大于 0，方向不是 None。牌正在拖动、正在翻牌或已被 Only Once 限制时，需要先结束当前操作或 Reset。
 
-示例场景使用 Input System UI 模块和 URP 相机附加组件，需要项目安装 Input System 与 URP，并启用 Input System 输入后端。核心组件只依赖 UGUI；其他渲染管线或旧输入项目可将预制体放入现有 Canvas，使用项目自己的相机、EventSystem 和输入模块。
+**图片变形或尺寸不合适**
 
-示例 UI 直接保存在场景中，停止运行时也能在 Hierarchy 查看和调整：
+调整根 RectTransform 的宽高比，使其与牌图一致。牌面和牌背使用相同的显示尺寸。示例中的牌由父级布局与锚点控制尺寸，可在场景中调整这些设置。
 
-- `Canvas / Demo controls`：标题、操作说明、状态，以及旋转操作、四角翻牌、四边翻牌三行按钮；布局组件负责宽度适配。
-- `Demo / CurlDemo`：绑定牌、控制面板、标题和状态文字。按钮的 On Click 在 Inspector 中绑定具名方法，旋转按钮使用 -30 / 30 的浮点参数。
-- `Canvas / Card area / Rotation space / CardCurl`：可直接拖动四角或四边；达到阈值后松手翻开，未达到则回弹。中心区域不响应。
+**Console 提示引用或层级错误**
 
-Canvas 上的纵向布局为说明面板和牌区分配空间；牌区内的 Aspect Ratio Fitter 保持正方形旋转空间，牌通过锚点按固定比例放入，留出任意角度旋转的余量。调整窗口尺寸时不需要额外的脚本计算。可在场景中调整说明、按钮布局与牌的锚点。
-
-Reset 恢复牌背、0° 和示例累计完成次数；Angle 0° 只恢复角度。Hint 与自动翻牌按钮先盖牌再演示，保留角度并允许反复使用；这是示例为方便重复操作所做的处理，核心组件不会自动 Reset。完成次数是示例累计值，和组件自上次 Reset 以来的 `FlipCompletedCount` 含义不同。
-
-`CurlDemo` 的阅读顺序是：OnEnable 订阅完成事件 → Rotate / ResetDemo / ShowHint / FlipFrom 调用牌的动作 → OnFlipComplete 接收完成通知 → RefreshLabel 更新界面。Update 只观察状态变化；实际拖动和动画由 CardCurl 处理。禁用或销毁 CurlDemo 时解除订阅并停止面板操作；UI 属于场景，不由脚本生成或销毁。
-
-本包未附带自动化测试程序集。接入后应在目标 Canvas、输入后端和渲染管线中检查八方向拖动、旋转、回弹、提示、Reset、阈值为零的点击翻牌以及多指输入。
+选中牌查看 CardCurl Inspector 中的错误说明。优先使用提供的预制体，并检查 Mask、Back、Front、Shadow 的引用及层级。

@@ -24,6 +24,16 @@ namespace ZStudio.UniKit.UI.Samples {
         [SerializeField]
         private Text m_Status;
 
+        // 四角与四边分别匹配，点击边按钮不会变成从角翻牌。
+        private static readonly CardCurl.DragArea[] s_Corners = {
+            CardCurl.DragArea.BottomLeft, CardCurl.DragArea.BottomRight, CardCurl.DragArea.TopLeft,
+            CardCurl.DragArea.TopRight
+        };
+
+        private static readonly CardCurl.DragArea[] s_Edges = {
+            CardCurl.DragArea.Left, CardCurl.DragArea.Right, CardCurl.DragArea.Top, CardCurl.DragArea.Bottom
+        };
+
         private int m_Completions;
         private string m_LastStatus;
 
@@ -98,7 +108,7 @@ namespace ZStudio.UniKit.UI.Samples {
             // Only Once 默认开启。先盖牌，保证翻开后仍能再次演示提示，并保留角度。
             m_Card.Reset();
 
-            if (!m_Card.TryShowDragTips(CardCurl.DragArea.BottomLeft)) {
+            if (!m_Card.TryShowDragTips(ScreenToCardArea(CardCurl.DragArea.BottomLeft))) {
                 Debug.LogWarning("CurlDemo：提示未启动，请检查 CardCurl 的 Tips Ratio 是否大于 0。", m_Card);
             }
 
@@ -122,9 +132,59 @@ namespace ZStudio.UniKit.UI.Samples {
 
             // 这些按钮用于反复演示自动翻牌，因此每次先 Reset；实际拖动没有这一步。
             m_Card.Reset();
-            m_Card.Flip(area);
+
+            // 按钮描述的是屏幕方向；CardCurl 接收的是牌自身的方向。
+            m_Card.Flip(ScreenToCardArea(area));
             RefreshLabel();
         }
+
+        /// <summary>选择投影到屏幕后最接近目标方向的牌边或牌角。</summary>
+        private CardCurl.DragArea ScreenToCardArea(CardCurl.DragArea screenArea) {
+            var rect = (RectTransform)m_Card.transform;
+            var canvas = m_Card.GetComponentInParent<Canvas>().rootCanvas;
+            Camera camera = canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : canvas.worldCamera;
+            Vector2 centre = RectTransformUtility.WorldToScreenPoint(camera, rect.TransformPoint(rect.rect.center));
+            Vector2 wantedDirection = AreaDirection(screenArea).normalized;
+            bool isCorner = screenArea is CardCurl.DragArea.BottomLeft or CardCurl.DragArea.BottomRight
+                or CardCurl.DragArea.TopLeft or CardCurl.DragArea.TopRight;
+            var candidates = isCorner ? s_Corners : s_Edges;
+            var bestArea = CardCurl.DragArea.None;
+            float bestScore = float.NegativeInfinity;
+
+            foreach (var candidate in candidates) {
+                var offset = Vector2.Scale(rect.rect.size * 0.5f, AreaDirection(candidate));
+                Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(camera,
+                    rect.TransformPoint(rect.rect.center + offset));
+                Vector2 screenDirection = screenPoint - centre;
+
+                if (screenDirection.sqrMagnitude < 0.0001f) {
+                    continue;
+                }
+
+                // 点积越大，朝向越接近；相同分数保留先匹配的方向，让临界角度的结果固定。
+                float score = Vector2.Dot(wantedDirection, screenDirection.normalized);
+
+                if (score > bestScore + 0.0001f) {
+                    bestScore = score;
+                    bestArea = candidate;
+                }
+            }
+
+            return bestArea;
+        }
+
+        private static Vector2 AreaDirection(CardCurl.DragArea area) =>
+            area switch {
+                CardCurl.DragArea.BottomLeft => new Vector2(-1, -1),
+                CardCurl.DragArea.BottomRight => new Vector2(1, -1),
+                CardCurl.DragArea.TopLeft => new Vector2(-1, 1),
+                CardCurl.DragArea.TopRight => new Vector2(1, 1),
+                CardCurl.DragArea.Left => Vector2.left,
+                CardCurl.DragArea.Right => Vector2.right,
+                CardCurl.DragArea.Top => Vector2.up,
+                CardCurl.DragArea.Bottom => Vector2.down,
+                _ => Vector2.zero
+            };
 
         private bool CanOperate() => isActiveAndEnabled && m_Card && m_Card.isActiveAndEnabled;
 
