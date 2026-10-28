@@ -41,8 +41,12 @@ namespace ZStudio.UniKit.UI.Samples {
                 m_Card.transform.localRotation = Quaternion.identity;
                 RefreshLabel();
             });
-            Button(rect, "Reset", 130, -65, m_Card.Reset);
-            Button(rect, "Hint", 260, -65, () => m_Card.ShowDragTips(CardCurl.DragArea.BottomLeft));
+            Button(rect, "Reset", 130, -65, ResetDemo);
+            Button(rect, "Hint", 260, -65, () => {
+                // 示例允许反复演示提示，包括 Only Once 已完成的牌。
+                m_Card.Reset();
+                m_Card.ShowDragTips(CardCurl.DragArea.BottomLeft);
+            });
 
             for (var i = 0; i < 8; i++) {
                 var area = (CardCurl.DragArea)(i + 1);
@@ -53,6 +57,13 @@ namespace ZStudio.UniKit.UI.Samples {
                     }, 86);
             }
 
+            RefreshLabel();
+        }
+
+        private void ResetDemo() {
+            m_Card.Reset();
+            m_Card.transform.localRotation = Quaternion.identity;
+            m_Completions = 0;
             RefreshLabel();
         }
 

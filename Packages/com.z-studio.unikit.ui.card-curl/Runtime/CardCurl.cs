@@ -72,7 +72,7 @@ namespace ZStudio.UniKit.UI {
 
         [Tooltip("提示移动距离，单位为牌根节点的本地 UI 单位，与 Canvas 模式无关。")]
         [SerializeField, Min(0)]
-        private float m_TipsOffset = 2f;
+        private float m_TipsOffset = 80f;
 
         [Header("UI组件引用")]
         [SerializeField]
