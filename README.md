@@ -84,7 +84,7 @@ UniKit/Packages/<包目录>/package.json
 | UI Banner Carousel | 示例需要安装 Input System，并启用新输入系统或 Both；导入 Demo 后打开 `Scenes/MinimalDemo.unity` 体验基础图片轮播，`Scenes/Demo.unity` 展示 Spine 与混合页面，完整示例还需要 Spine Unity 4.2 |
 | UI Marquee | 导入 Demo 后打开 `Scenes/Demo.unity`；示例需要安装 Input System，并启用新输入系统或 Both |
 | UI Safe Area / Camera Scaler | 按对应 Kit 文档在自己的 UI 或相机对象上添加组件 |
-| UI Card Curl | 直接打开包内 `Samples/Demo/Demo.unity`；示例使用 Input System 与 URP，核心组件可接入工程现有的 UGUI 输入模块 |
+| UI Card Curl | 在 Package Manager 中选择 UI Card Curl，导入 **Samples → Demo** 后打开 `Assets/Samples/UI Card Curl/<包版本>/Demo/Demo.unity`；示例使用 Input System 与 URP，核心组件可接入工程现有的 UGUI 输入模块 |
 | Sprite Font Generator | 菜单 **Tools → UniKit → Sprite Font Generator** |
 | Texture Slicer | 菜单 **Tools → UniKit → Texture Slicer** |
 | Component Replacer | 菜单 **Tools → UniKit → Component Replacer**，或 Inspector 组件右键 **Replace Component…** |

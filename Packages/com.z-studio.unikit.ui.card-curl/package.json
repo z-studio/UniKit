@@ -13,7 +13,7 @@
   "samples": [
     {
       "displayName": "Demo",
-      "path": "Samples/Demo"
+      "path": "Samples~/Demo"
     }
   ]
 }

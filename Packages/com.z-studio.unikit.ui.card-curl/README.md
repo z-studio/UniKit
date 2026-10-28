@@ -6,8 +6,9 @@
 
 1. 使用 Unity 6，并安装 UGUI、Input System 和 URP。示例场景使用 Input System UI 输入模块和 URP 相机。
 2. 在 **Project Settings → Player → Active Input Handling** 中启用 Input System；修改后按 Unity 提示重启编辑器。
-3. 打开包内的 `Samples/Demo/Demo.unity`，进入 Play Mode。
-4. 从牌的四角或四边向内拖动，然后松手。牌的中心区域不响应操作。
+3. 打开 **Window → Package Manager**，在 **In Project** 中选择 **UI Card Curl**，展开 **Samples**，点击 **Demo → Import**。
+4. 在 Project 窗口打开 `Assets/Samples/UI Card Curl/1.0.0/Demo/Demo.unity`，进入 Play Mode。
+5. 从牌的四角或四边向内拖动，然后松手。牌的中心区域不响应操作。
 
 | 示例操作 | 作用 |
 | --- | --- |
@@ -121,6 +122,8 @@ public sealed class CardCurlExample : MonoBehaviour {
 开启 Only Once 并完成翻牌、组件被禁用、方向为 None 或正在翻牌时，动作请求可能被拒绝。Tips Ratio 为 0 时也不会启动提示。
 
 ## 了解示例结构
+
+示例源文件位于包内的 `Samples~/Demo`，通过 Package Manager 导入后在 `Assets/Samples/UI Card Curl/<包版本>/Demo` 中使用。示例脚本只在导入后参与工程编译。需要调整 UI、按钮绑定或脚本时，请修改已导入的示例；重新导入前先备份自己的修改。
 
 - `Canvas / Demo controls`：标题、操作说明、状态文字和三行按钮。按钮的 On Click 已在 Inspector 中配置，可以直接查看绑定的方法。
 - `Canvas / Card area / Rotation space / CardCurl`：牌的显示区域。布局组件负责为面板和牌分配空间，锚点控制牌的比例，并为旋转留出余量。
