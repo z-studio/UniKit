@@ -8,7 +8,7 @@ Unity 6、UGUI 2.0。核心包不依赖 URP、RenderTexture 或第三方 Tween�
 
 1. 在 Canvas 下放入 `Res/CardCurl.prefab`，或选中 Canvas 内父节点执行 **Tools → UniKit → UI Card Curl → Create UI Card**。
 2. 在组件 Inspector 指定 Front Image / Back Image，或调用 SetFrontImage / SetBackImage。预制体提供参考素材默认值。
-3. 保留预制体中的 Mask → Back → Front → Shadow 层级和八个 Anchor / DragArea 引用。旋转和缩放组件根节点或它的父节点。
+3. 保留预制体中的 Mask → Back → Front → Shadow 层级，只绑定这四个引用。八方向的起点与命中区直接从根 RectTransform 计算，不再需要 Anchor / DragArea 物体。
 4. 项目继续使用已有的 EventSystem 与输入模块。
 
 ```csharp
@@ -24,9 +24,13 @@ card.Reset();
 card.ShowDragTips(CardCurl.EDragArea.BottomLeft);
 ```
 
-`SetFrontImage`、`SetBackImage` 和 `Reset` 会停止当前动画、清除指针并重新盖牌。`Flip` 播放指定方向的翻牌；`ShowDragTips` 使用传入方向。`Only Once` 默认开启，完成后需要 Reset 才能再次交互。完成事件在旧动作结束和终态写入之后派发，回调内可以立即 Reset 或换图。
+`SetFrontImage`、`SetBackImage` 和 `Reset` 会停止当前动画、清除指针并重新盖牌；同时换两面时可用 `SetImages(front, back)`。它们不会改变根节点尺寸和锚点，正反面统一使用根节点尺寸。`Flip` 播放指定方向的翻牌；`ShowDragTips` 使用传入方向，Tips Offset 始终是牌根节点的本地 UI 单位，不随 Canvas 模式改变。`Only Once` 默认开启，完成后需要 Reset 才能再次交互。完成事件在旧动作结束和终态写入之后派发，回调内可以立即 Reset 或换图。
 
 拖动只有一个捕获指针。轻触松手同样释放捕获，第二根手指不会改动第一根手指的状态。回弹、提示和翻牌均插值根节点局部位置，使用 unscaledDeltaTime；修改父节点位置、旋转或缩放不会把动画终点留在旧世界位置。
+
+交互中心区域不拦截射线；四角和四边沿用原来的 30% 命中区。根节点尺寸变化时，未提交的拖动/提示会取消，已经提交的翻牌重映射到新布局后继续完成。动画数据在 LateUpdate 统一推进，每帧只提交一次几何；静止时只检查根节点尺寸和变换是否变化。
+
+Inspector 会显示具体缺失引用、组件或内部层级错误。编辑器预览更新由自定义 Inspector 在主线程执行，OnValidate 只处理数据校验。
 
 ## 旋转修复
 

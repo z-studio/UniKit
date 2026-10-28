@@ -1,11 +1,17 @@
-using System;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace ZStudio.UniKit.UI {
-    public class CardCurl : MonoBehaviour, IDragHandler, IEndDragHandler, IPointerDownHandler, IPointerUpHandler {
+    /// <summary>
+    /// 根 RectTransform 定义牌的尺寸和八个交互方向；所有运动数据都在它的局部坐标系中。
+    /// 输入只修改状态，LateUpdate 统一推进动画和提交几何，完成通知最后派发。
+    /// </summary>
+    [DisallowMultipleComponent]
+    [RequireComponent(typeof(RectTransform), typeof(Image))]
+    public class CardCurl : MonoBehaviour, IDragHandler, IEndDragHandler, IPointerDownHandler,
+        IPointerUpHandler, ICanvasRaycastFilter {
         public enum EDragArea {
             None,
             BottomLeft,
@@ -15,31 +21,16 @@ namespace ZStudio.UniKit.UI {
             Left,
             Right,
             Top,
-            Bottom,
+            Bottom
         }
 
-        [Serializable]
-        public class DragAnchor {
-            public RectTransform bottomLeft;
-            public RectTransform bottomRight;
-            public RectTransform topLeft;
-            public RectTransform topRight;
-            public RectTransform left;
-            public RectTransform right;
-            public RectTransform top;
-            public RectTransform bottom;
-        }
-
-        [Serializable]
-        public class DragArea {
-            public RectTransform bottomLeft;
-            public RectTransform bottomRight;
-            public RectTransform topLeft;
-            public RectTransform topRight;
-            public RectTransform left;
-            public RectTransform right;
-            public RectTransform top;
-            public RectTransform bottom;
+        private enum State {
+            Idle,
+            Dragging,
+            Returning,
+            Hinting,
+            PreparingFlip,
+            Flipping
         }
 
         [Header("图片设置")]
@@ -53,18 +44,17 @@ namespace ZStudio.UniKit.UI {
         [SerializeField]
         private CurlEase m_RecoveryEase = CurlEase.Linear;
 
-        [SerializeField]
+        [SerializeField, Min(0.001f)]
         private float m_RecoveryTime = 0.25f;
 
         [Header("翻页设置")]
-        [Range(0f, 1f)]
-        [SerializeField]
+        [SerializeField, Range(0, 1)]
         private float m_FlipThreshold = 0.5f;
 
         [SerializeField]
         private CurlEase m_FlipEase = CurlEase.OutSine;
 
-        [SerializeField]
+        [SerializeField, Min(0.001f)]
         private float m_FlipTime = 0.25f;
 
         [SerializeField]
@@ -77,131 +67,177 @@ namespace ZStudio.UniKit.UI {
         [SerializeField]
         private CurlEase m_TipsEase = CurlEase.OutSine;
 
-        [SerializeField]
+        [SerializeField, Min(0.001f)]
         private float m_TipsTime = 0.5f;
 
-        [SerializeField]
+        [Tooltip("提示移动距离，单位为牌根节点的本地 UI 单位，与 Canvas 模式无关。")]
+        [SerializeField, Min(0)]
         private float m_TipsOffset = 2f;
 
         [Header("UI组件引用")]
         [SerializeField]
-        private RectTransform m_Front;
+        private RectTransform m_Mask;
 
         [SerializeField]
         private RectTransform m_Back;
 
         [SerializeField]
-        private RectTransform m_Mask;
+        private RectTransform m_Front;
 
         [SerializeField]
         private RectTransform m_Shadow;
 
-        [SerializeField]
-        private DragAnchor m_DragAnchor;
-
-        [SerializeField]
-        private DragArea m_DragArea;
-
         public UnityEvent onFlipComplete;
 
-        // 所有运动状态都在 CardCurl 根节点坐标系中保存。
-        // Front 位于 Back/Mask 之下，不能把它受父层级影响的世界位置作为下一帧输入。
+        // 与原预制体一致：四角各占宽高的 30%，中间四条边承接整边拖动。
+        private const float k_HotspotSize = 0.3f;
         private RectTransform m_Rect;
-        private Image m_ImgFront;
-        private Image m_ImgBack;
+        private Image m_ImgRoot, m_ImgBack, m_ImgFront;
+        private State m_State;
         private EDragArea m_CurrentDragArea;
-        private Vector3 m_FrontPosition;
-        private Vector3 m_BeginFrontPosition;
-        private Vector3 m_BeginPointerPosition;
-        private float m_FrontAngle;
+        private Motion m_Motion;
+        private Vector3 m_FrontPosition, m_BeginFrontPosition, m_BeginPointerPosition;
         private int? m_PointerId;
-        private bool m_Initialized;
-        private bool m_IsDragging;
         private int m_FlipCompletedCount;
-        private Motion m_RecoveryTween;
-        private Motion m_TipsTween;
-        private Motion m_FlipTween;
+        private bool m_Initialized, m_GeometryDirty;
+        private volatile bool m_ConfigurationDirty = true;
+        private Rect m_LastRect;
+        private Matrix4x4 m_LastMatrix;
+        private string m_LastError;
 
         private void Awake() => Initialize();
 
+        private void OnEnable() => m_GeometryDirty = true;
+
         private void Start() {
-            if (Initialize() && m_CurrentDragArea == EDragArea.None && m_FlipCompletedCount == 0) {
+            if (Initialize() && m_State == State.Idle && m_FlipCompletedCount == 0) {
                 ShowDragTips(m_StartingDragAreaTips);
             }
         }
 
+        private void OnValidate() {
+            // 这里只校验数据。Inspector 的预览由 Editor 在主线程调用 Reset 完成。
+            m_RecoveryTime = Mathf.Max(0.001f, m_RecoveryTime);
+            m_FlipTime = Mathf.Max(0.001f, m_FlipTime);
+            m_TipsTime = Mathf.Max(0.001f, m_TipsTime);
+            m_TipsOffset = Mathf.Max(0, m_TipsOffset);
+            m_FlipThreshold = Mathf.Clamp01(m_FlipThreshold);
+            m_ConfigurationDirty = true;
+        }
+
+        /// <summary>绑定缺失或内部层级不正确时，返回可直接定位的原因。</summary>
+        public bool ValidateConfiguration(out string error) {
+            if (!m_Mask) {
+                error = "未绑定 m_Mask。";
+            } else if (!m_Back) {
+                error = "未绑定 m_Back。";
+            } else if (!m_Front) {
+                error = "未绑定 m_Front。";
+            } else if (!m_Shadow) {
+                error = "未绑定 m_Shadow。";
+            } else if (!m_Back.GetComponent<Image>()) {
+                error = "m_Back 缺少 Image。";
+            } else if (!m_Front.GetComponent<Image>()) {
+                error = "m_Front 缺少 Image。";
+            } else if (!m_Mask.GetComponent<Graphic>()) {
+                error = "m_Mask 缺少 UGUI Graphic。";
+            } else if (!m_Shadow.GetComponent<Graphic>()) {
+                error = "m_Shadow 缺少 UGUI Graphic。";
+            } else if (m_Mask.parent != transform || m_Back.parent != m_Mask ||
+                       m_Front.parent != m_Back || m_Shadow.parent != m_Front) {
+                error = "内部层级应为 CardCurl → Mask → Back → Front → Shadow。";
+            } else if (!m_Mask.GetComponent<Mask>() || !m_Front.GetComponent<Mask>()) {
+                error = "Mask 和 Front 均需要 UGUI Mask 组件。";
+            } else {
+                error = null;
+                return true;
+            }
+
+            return false;
+        }
+
         private bool Initialize() {
+            if (m_ConfigurationDirty) {
+                m_ConfigurationDirty = false;
+                m_Initialized = false;
+                CancelInteraction();
+                m_FlipCompletedCount = 0;
+            }
+
             if (m_Initialized) {
                 return true;
             }
 
-            m_Rect = transform as RectTransform;
+            if (!ValidateConfiguration(out string error)) {
+                if (Application.isPlaying && error != m_LastError) {
+                    Debug.LogError("CardCurl: " + error, this);
+                }
 
-            if (!m_Rect || !m_Front || !m_Back || !m_Mask || !m_Shadow || m_DragAnchor == null
-                || m_DragArea == null) {
+                m_LastError = error;
                 return false;
             }
 
-            m_ImgFront = m_Front.GetComponent<Image>();
+            m_LastError = null;
+            m_Rect = (RectTransform)transform;
+            m_ImgRoot = GetComponent<Image>();
             m_ImgBack = m_Back.GetComponent<Image>();
-
-            if (!m_ImgFront || !m_ImgBack || !GetComponent<Image>()) {
-                return false;
-            }
-
+            m_ImgFront = m_Front.GetComponent<Image>();
             m_Initialized = true;
             ApplyImages();
+            UpdateLayout();
             ResetGeometry();
             return true;
         }
 
-        private void OnValidate() {
-            m_RecoveryTime = Mathf.Max(0.001f, m_RecoveryTime);
-            m_FlipTime = Mathf.Max(0.001f, m_FlipTime);
-            m_TipsTime = Mathf.Max(0.001f, m_TipsTime);
-            m_FlipThreshold = Mathf.Clamp01(m_FlipThreshold);
-
-            if (Application.isPlaying) {
-                return;
+        private void ApplyImages() {
+            // 图片内容与尺寸分离：不修改根节点尺寸、锚点或外部布局。
+            if (m_ImgRoot.sprite != m_BackImage) {
+                m_ImgRoot.sprite = m_BackImage;
             }
 
-            m_Initialized = false;
-            Initialize();
+            if (m_ImgBack.sprite != m_BackImage) {
+                m_ImgBack.sprite = m_BackImage;
+            }
+
+            if (m_ImgFront.sprite != m_FrontImage) {
+                m_ImgFront.sprite = m_FrontImage;
+            }
         }
 
-        private void ApplyImages() {
-            var root = GetComponent<Image>();
-            root.sprite = m_BackImage;
-            m_ImgBack.sprite = m_BackImage;
-            m_ImgFront.sprite = m_FrontImage;
+        private void UpdateLayout() {
+            Rect rect = m_Rect.rect;
+            float max = Mathf.Max(rect.width, rect.height);
+            m_Mask.sizeDelta = new Vector2(max * 2, rect.size.magnitude * 2);
+            SetSize(m_Back, rect.size);
+            SetSize(m_Front, rect.size);
+            m_Shadow.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, max * 2);
+            m_LastRect = rect;
+            m_GeometryDirty = true;
+        }
 
-            if (m_BackImage) {
-                root.SetNativeSize();
-                m_ImgBack.SetNativeSize();
-            }
-
-            if (m_FrontImage) {
-                m_ImgFront.SetNativeSize();
-            }
-
-            float width = m_Rect.rect.width, height = m_Rect.rect.height;
-            m_Mask.sizeDelta =
-                new Vector2(Mathf.Max(width, height) * 2, Mathf.Sqrt(width * width + height * height) * 2);
-            m_Shadow.sizeDelta = new Vector2(m_Shadow.sizeDelta.x, Mathf.Max(width, height) * 2);
+        private static void SetSize(RectTransform rect, Vector2 size) {
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, size.x);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, size.y);
         }
 
         public void Reset() {
-            StopAnimations();
-            m_IsDragging = false;
-            m_PointerId = null;
-            m_FlipCompletedCount = 0;
-
             if (!Initialize()) {
                 return;
             }
 
+            CancelInteraction();
+            m_FlipCompletedCount = 0;
             ApplyImages();
+
+            if (m_Rect.rect != m_LastRect) {
+                UpdateLayout();
+            }
+
             ResetGeometry();
+
+            if (!Application.isPlaying || !isActiveAndEnabled) {
+                CommitGeometry();
+            }
         }
 
         public void SetFrontImage(Sprite sprite) {
@@ -214,208 +250,54 @@ namespace ZStudio.UniKit.UI {
             Reset();
         }
 
-        private void StopAnimations() {
-            if (m_RecoveryTween.isAlive) {
-                m_RecoveryTween.Stop();
-            }
+        public void SetImages(Sprite front, Sprite back) {
+            m_FrontImage = front;
+            m_BackImage = back;
+            Reset();
+        }
 
-            if (m_TipsTween.isAlive) {
-                m_TipsTween.Stop();
-            }
-
-            if (m_FlipTween.isAlive) {
-                m_FlipTween.Stop();
-            }
+        private void CancelInteraction() {
+            m_State = State.Idle;
+            m_Motion = default;
+            m_PointerId = null;
         }
 
         private void OnDisable() {
-            StopAnimations();
-            m_PointerId = null;
-            m_IsDragging = false;
+            CancelInteraction();
 
             if (m_Initialized) {
                 ResetGeometry();
+
+                // 单独禁用组件时 UI 仍可见，需要立即显示取消后的平铺状态。
+                CommitGeometry();
             }
-        }
-
-        private void OnDestroy() => StopAnimations();
-
-        private Vector3 CardPosition(RectTransform anchor) => m_Rect.InverseTransformPoint(anchor.position);
-
-        private RectTransform GetAnchor(EDragArea area) =>
-            area switch {
-                EDragArea.BottomLeft => m_DragAnchor.bottomLeft,
-                EDragArea.BottomRight => m_DragAnchor.bottomRight,
-                EDragArea.TopLeft => m_DragAnchor.topLeft,
-                EDragArea.TopRight => m_DragAnchor.topRight,
-                EDragArea.Left => m_DragAnchor.left,
-                EDragArea.Right => m_DragAnchor.right,
-                EDragArea.Top => m_DragAnchor.top,
-                EDragArea.Bottom => m_DragAnchor.bottom,
-                _ => null
-            };
-
-        private bool SelectArea(EDragArea area) {
-            var anchor = GetAnchor(area);
-
-            if (!anchor) {
-                return false;
-            }
-
-            m_CurrentDragArea = area;
-            m_FrontPosition = m_BeginFrontPosition = CardPosition(anchor);
-            m_FrontAngle = 0;
-            (Vector2 pivot, Vector2 attachment) = area switch {
-                EDragArea.BottomLeft => (new Vector2(0, 1), new Vector2(0, 0)),
-                EDragArea.BottomRight => (new Vector2(1, 1), new Vector2(1, 0)),
-                EDragArea.TopLeft => (new Vector2(0, 0), new Vector2(0, 1)),
-                EDragArea.TopRight => (new Vector2(1, 0), new Vector2(1, 1)),
-                EDragArea.Left => (new Vector2(1, 0.5f), new Vector2(0, 0.5f)),
-                EDragArea.Right => (new Vector2(0, 0.5f), new Vector2(1, 0.5f)),
-                EDragArea.Top => (new Vector2(0.5f, 0), new Vector2(0.5f, 1)),
-                _ => (new Vector2(0.5f, 1), new Vector2(0.5f, 0))
-            };
-            m_Front.pivot = pivot;
-            m_Front.anchorMin = m_Front.anchorMax = attachment;
-            RefreshDragTransform();
-            return true;
         }
 
         private void ResetGeometry() {
-            if (!SelectArea(EDragArea.BottomLeft)) {
-                return;
-            }
-
-            m_CurrentDragArea = EDragArea.None;
+            SelectArea(EDragArea.BottomLeft);
+            m_State = State.Idle;
         }
 
-        // 根据根节点局部姿态提交到现有 Mask → Back → Front → Shadow 层级。
-        // 顺序很重要：先移动遮罩，再反向补偿 Back，最后放置 Front 和阴影。
-        private void SetCardPose(RectTransform target, Vector3 position, float angle) {
-            target.SetPositionAndRotation(m_Rect.TransformPoint(position),
-                m_Rect.rotation * Quaternion.Euler(0, 0, angle));
-        }
+        private bool CanInteract =>
+            isActiveAndEnabled && !(m_OnlyOnce && m_FlipCompletedCount > 0) &&
+            m_State != State.PreparingFlip && m_State != State.Flipping;
 
-        private void RefreshDragTransform() {
-            if (!m_Initialized) {
-                return;
-            }
-
-            var anchor = GetAnchor(m_CurrentDragArea);
-
-            if (!anchor) {
-                return;
-            }
-
-            Vector3 origin = CardPosition(anchor);
-            Vector3 delta = m_FrontPosition - origin;
-            float theta = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
-            m_FrontAngle = m_CurrentDragArea switch {
-                EDragArea.BottomLeft when theta > 0 && theta < 90 => (theta - 90) * 2,
-                EDragArea.BottomRight when theta > 90 && theta < 180 => (theta - 90) * 2,
-                EDragArea.TopLeft when theta > -90 && theta < 0 => (theta + 90) * 2,
-                EDragArea.TopRight when theta > -180 && theta < -90 => (theta + 90) * 2,
-                _ => 0
+        private Vector3 CardPosition(EDragArea area) {
+            Rect r = m_Rect.rect;
+            return area switch {
+                EDragArea.BottomLeft => new Vector3(r.xMin, r.yMin),
+                EDragArea.BottomRight => new Vector3(r.xMax, r.yMin),
+                EDragArea.TopLeft => new Vector3(r.xMin, r.yMax),
+                EDragArea.TopRight => new Vector3(r.xMax, r.yMax),
+                EDragArea.Left => new Vector3(r.xMin, r.center.y),
+                EDragArea.Right => new Vector3(r.xMax, r.center.y),
+                EDragArea.Top => new Vector3(r.center.x, r.yMax),
+                _ => new Vector3(r.center.x, r.yMin)
             };
-            float maskAngle = m_CurrentDragArea switch {
-                EDragArea.BottomLeft or EDragArea.BottomRight => m_FrontAngle * 0.5f,
-                EDragArea.TopLeft or EDragArea.TopRight => m_FrontAngle * 0.5f + 180,
-                EDragArea.Left => -90,
-                EDragArea.Right => 90,
-                EDragArea.Top => 180,
-                _ => 0
-            };
-            Vector3 fold = (origin + m_FrontPosition) * 0.5f;
-            SetCardPose(m_Mask, fold, maskAngle);
-            SetCardPose(m_Back, m_Rect.rect.center, 0);
-            SetCardPose(m_Front, m_FrontPosition, m_FrontAngle);
-            SetCardPose(m_Shadow, fold, maskAngle + 90);
         }
 
-        private void LateUpdate() {
-            TickMotion(ref m_RecoveryTween, Time.unscaledDeltaTime);
-            TickMotion(ref m_TipsTween, Time.unscaledDeltaTime);
-            TickMotion(ref m_FlipTween, Time.unscaledDeltaTime);
-            RefreshDragTransform();
-        }
-
-        private void SetFrontPosition(Vector3 value) {
-            m_FrontPosition = value;
-            RefreshDragTransform();
-        }
-
-        // 动画只插值根节点局部数据；包本身不依赖第三方 Tween。
-        private enum MotionCycle {
-            Restart,
-            Yoyo
-        }
-
-        private struct Motion {
-            public bool isAlive;
-            public Vector3 from, to;
-            public float duration, elapsed;
-            public CurlEase ease;
-            public int cycles;
-            public MotionCycle cycleMode;
-            public Action completed;
-
-            public void Stop() {
-                isAlive = false;
-                completed = null;
-            }
-
-            public Motion OnComplete(Action callback) {
-                completed = callback;
-                return this;
-            }
-        }
-
-        private Motion MoveFront(Vector3 target, float duration, CurlEase ease, int cycles = 1,
-            MotionCycle cycleMode = MotionCycle.Restart) =>
-            new() {
-                isAlive = true,
-                from = m_FrontPosition,
-                to = target,
-                duration = Mathf.Max(0.001f, duration),
-                ease = ease,
-                cycles = cycles,
-                cycleMode = cycleMode
-            };
-
-        private void TickMotion(ref Motion motion, float deltaTime) {
-            if (!motion.isAlive) {
-                return;
-            }
-
-            motion.elapsed += deltaTime;
-            bool done = motion.elapsed >= motion.duration * motion.cycles;
-            int cycle = Mathf.Min((int)(motion.elapsed / motion.duration), motion.cycles - 1);
-            float t = done ? 1 : Mathf.Clamp01(motion.elapsed / motion.duration - cycle);
-
-            if (motion.cycleMode == MotionCycle.Yoyo && (cycle & 1) != 0) {
-                t = 1 - t;
-            }
-
-            float eased = motion.ease switch {
-                CurlEase.InSine => 1 - Mathf.Cos(t * Mathf.PI * 0.5f),
-                CurlEase.OutSine => Mathf.Sin(t * Mathf.PI * 0.5f),
-                CurlEase.InOutSine => (1 - Mathf.Cos(t * Mathf.PI)) * 0.5f,
-                _ => t
-            };
-            SetFrontPosition(Vector3.LerpUnclamped(motion.from, motion.to, eased));
-
-            if (!done) {
-                return;
-            }
-
-            Action completed = motion.completed;
-            motion.Stop();
-            // 终态和旧动画先结束，再允许回调创建下一段动画或 Reset。
-            completed?.Invoke();
-        }
-
-        private Vector3 OppositePosition(EDragArea area) =>
-            CardPosition(GetAnchor(area switch {
+        private static EDragArea Opposite(EDragArea area) =>
+            area switch {
                 EDragArea.BottomLeft => EDragArea.TopRight,
                 EDragArea.BottomRight => EDragArea.TopLeft,
                 EDragArea.TopLeft => EDragArea.BottomRight,
@@ -424,101 +306,281 @@ namespace ZStudio.UniKit.UI {
                 EDragArea.Right => EDragArea.Left,
                 EDragArea.Top => EDragArea.Bottom,
                 _ => EDragArea.Top
-            }));
+            };
 
-        public void ShowDragTips(EDragArea dragArea) {
-            if (!Initialize() || dragArea == EDragArea.None || m_FlipTween.isAlive || m_IsDragging ||
-                (m_OnlyOnce && m_FlipCompletedCount > 0)) {
-                return;
+        private bool SelectArea(EDragArea area) {
+            if (area is < EDragArea.BottomLeft or > EDragArea.Bottom) {
+                return false;
             }
 
-            StopAnimations();
+            m_CurrentDragArea = area;
+            m_FrontPosition = m_BeginFrontPosition = CardPosition(area);
+            m_GeometryDirty = true;
+            return true;
+        }
+
+        public void ShowDragTips(EDragArea dragArea) {
+            if (!Initialize() || !CanInteract || m_State == State.Dragging) {
+                return;
+            }
 
             if (!SelectArea(dragArea)) {
                 return;
             }
 
-            Vector3 direction = (OppositePosition(dragArea) - m_BeginFrontPosition).normalized;
-            // 保留原 Overlay 提示幅度，但只转换局部长度，不混入世界方向和父级缩放。
-            Canvas canvas = GetComponentInParent<Canvas>();
-            CanvasScaler scaler = canvas ? canvas.rootCanvas.GetComponent<CanvasScaler>() : null;
-            float offset = m_TipsOffset * (canvas && canvas.rootCanvas.renderMode == RenderMode.ScreenSpaceOverlay
-                ? (scaler ? scaler.referencePixelsPerUnit : 100) : 1);
-            m_TipsTween = MoveFront(m_BeginFrontPosition + direction * offset, m_TipsTime, m_TipsEase, 4,
-                MotionCycle.Yoyo);
+            Vector3 direction = (CardPosition(Opposite(dragArea)) - m_BeginFrontPosition).normalized;
+            StartMotion(State.Hinting, m_BeginFrontPosition + direction * m_TipsOffset,
+                m_TipsTime, m_TipsEase, 4);
         }
 
         public void Flip(EDragArea dragArea) {
-            if (!Initialize() || m_FlipTween.isAlive || (m_OnlyOnce && m_FlipCompletedCount > 0)
-                || dragArea == EDragArea.None) {
+            if (!Initialize() || !CanInteract || !SelectArea(dragArea)) {
                 return;
             }
 
-            StopAnimations();
-            m_IsDragging = false;
             m_PointerId = null;
+            Rect r = m_Rect.rect;
 
-            if (!SelectArea(dragArea)) {
-                return;
-            }
-
-            Vector3 topCenter = (CardPosition(m_DragAnchor.topLeft) + CardPosition(m_DragAnchor.topRight)) * 0.5f;
-            Vector3 bottomCenter =
-                (CardPosition(m_DragAnchor.bottomLeft) + CardPosition(m_DragAnchor.bottomRight)) * 0.5f;
             Vector3 destination = dragArea switch {
-                EDragArea.BottomLeft or EDragArea.BottomRight => topCenter,
-                EDragArea.TopLeft or EDragArea.TopRight => bottomCenter,
-                _ => OppositePosition(dragArea)
+                EDragArea.BottomLeft or EDragArea.BottomRight => new Vector3(r.center.x, r.yMax),
+                EDragArea.TopLeft or EDragArea.TopRight => new Vector3(r.center.x, r.yMin),
+                _ => CardPosition(Opposite(dragArea))
             };
-            m_FlipTween = MoveFront(Vector3.Lerp(m_BeginFrontPosition, destination, m_FlipThreshold), m_FlipTime,
-                    m_FlipEase)
-                .OnComplete(TriggerFlip);
+
+            StartMotion(State.PreparingFlip, Vector3.Lerp(m_BeginFrontPosition, destination, m_FlipThreshold),
+                m_FlipTime, m_FlipEase);
         }
 
-        private EDragArea HitArea(GameObject hit) {
-            if (!hit) {
+        private struct Motion {
+            public Vector3 from, to;
+            public float duration, elapsed;
+            public CurlEase ease;
+            public int cycles;
+        }
+
+        private void StartMotion(State state, Vector3 target, float duration, CurlEase ease, int cycles = 1) {
+            m_State = state;
+            m_Motion = new Motion {
+                from = m_FrontPosition,
+                to = target,
+                duration = Mathf.Max(0.001f, duration),
+                ease = ease,
+                cycles = cycles
+            };
+        }
+
+        private bool AdvanceMotion(float deltaTime) {
+            m_Motion.elapsed += deltaTime;
+            bool done = m_Motion.elapsed >= m_Motion.duration * m_Motion.cycles;
+            int cycle = Mathf.Min((int)(m_Motion.elapsed / m_Motion.duration), m_Motion.cycles - 1);
+            float t = done ? 1 : Mathf.Clamp01(m_Motion.elapsed / m_Motion.duration - cycle);
+
+            if (m_State == State.Hinting && (cycle & 1) != 0) {
+                t = 1 - t;
+            }
+
+            float eased = m_Motion.ease switch {
+                CurlEase.InSine => 1 - Mathf.Cos(t * Mathf.PI * 0.5f),
+                CurlEase.OutSine => Mathf.Sin(t * Mathf.PI * 0.5f),
+                CurlEase.InOutSine => (1 - Mathf.Cos(t * Mathf.PI)) * 0.5f,
+                _ => t
+            };
+
+            m_FrontPosition = Vector3.LerpUnclamped(m_Motion.from, m_Motion.to, eased);
+            m_GeometryDirty = true;
+            return done;
+        }
+
+        private void LateUpdate() {
+            if (m_ConfigurationDirty && !Initialize()) {
+                return;
+            }
+
+            if (!m_Initialized) {
+                return;
+            }
+
+            if (m_Rect.rect != m_LastRect) {
+                if (m_State is State.PreparingFlip or State.Flipping) {
+                    // 已提交的翻牌继续完成；把动画通道重映射到新尺寸，保留时钟。
+                    m_FrontPosition = ResizePoint(m_FrontPosition);
+                    m_Motion.from = ResizePoint(m_Motion.from);
+                    m_Motion.to = ResizePoint(m_Motion.to);
+                    m_BeginFrontPosition = CardPosition(m_CurrentDragArea);
+                    UpdateLayout();
+                } else {
+                    // 未提交的触点/提示不再适用于新布局，释放后重新开始。
+                    CancelInteraction();
+                    UpdateLayout();
+                    ResetGeometry();
+                }
+            }
+
+            bool completed = false;
+
+            if (m_State is State.Returning or State.Hinting or State.PreparingFlip or State.Flipping) {
+                if (AdvanceMotion(Time.unscaledDeltaTime)) {
+                    if (m_State == State.PreparingFlip) {
+                        BeginFlip();
+                    } else {
+                        completed = m_State == State.Flipping;
+
+                        if (completed) {
+                            (m_ImgFront.sprite, m_ImgBack.sprite) = (m_ImgBack.sprite, m_ImgFront.sprite);
+                            m_FlipCompletedCount++;
+                        }
+
+                        ResetGeometry();
+                    }
+                }
+            }
+
+            if (m_GeometryDirty || m_Rect.localToWorldMatrix != m_LastMatrix) {
+                CommitGeometry();
+            }
+
+            // 状态与画面先完成，再允许业务在回调内 Reset、换图或销毁物体。
+            if (completed) {
+                onFlipComplete?.Invoke();
+            }
+        }
+
+        private Vector3 ResizePoint(Vector3 point) {
+            Rect next = m_Rect.rect;
+            float u = m_LastRect.width > 0 ? (point.x - m_LastRect.xMin) / m_LastRect.width : 0;
+            float v = m_LastRect.height > 0 ? (point.y - m_LastRect.yMin) / m_LastRect.height : 0;
+            return new Vector3(next.xMin + u * next.width, next.yMin + v * next.height);
+        }
+
+        private float CurlAngle() {
+            Vector3 delta = m_FrontPosition - CardPosition(m_CurrentDragArea);
+            float theta = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
+
+            return m_CurrentDragArea switch {
+                EDragArea.BottomLeft when theta is > 0 and < 90 => (theta - 90) * 2,
+                EDragArea.BottomRight when theta is > 90 and < 180 => (theta - 90) * 2,
+                EDragArea.TopLeft when theta is > -90 and < 0 => (theta + 90) * 2,
+                EDragArea.TopRight when theta is > -180 and < -90 => (theta + 90) * 2,
+                _ => 0
+            };
+        }
+
+        private Vector3 GetFlipTargetPosition() {
+            float angle = Mathf.Repeat(CurlAngle(), 360);
+
+            var target = m_CurrentDragArea switch {
+                EDragArea.BottomLeft => angle < 270 ? EDragArea.BottomRight : EDragArea.TopLeft,
+                EDragArea.BottomRight => angle > 90 ? EDragArea.BottomLeft : EDragArea.TopRight,
+                EDragArea.TopLeft => angle > 90 ? EDragArea.TopRight : EDragArea.BottomLeft,
+                EDragArea.TopRight => angle < 270 ? EDragArea.TopLeft : EDragArea.BottomRight,
+                _ => Opposite(m_CurrentDragArea)
+            };
+
+            return CardPosition(target);
+        }
+
+        private void BeginFlip() => StartMotion(State.Flipping, GetFlipTargetPosition(), m_FlipTime, m_FlipEase);
+
+        private void CommitGeometry() {
+            var pivot = m_CurrentDragArea switch {
+                EDragArea.BottomLeft => new Vector2(0, 1),
+                EDragArea.BottomRight => Vector2.one,
+                EDragArea.TopLeft => Vector2.zero,
+                EDragArea.TopRight => new Vector2(1, 0),
+                EDragArea.Left => new Vector2(1, 0.5f),
+                EDragArea.Right => new Vector2(0, 0.5f),
+                EDragArea.Top => new Vector2(0.5f, 0),
+                _ => new Vector2(0.5f, 1)
+            };
+
+            Vector2 attachment = Vector2.one - pivot;
+
+            if (m_Front.pivot != pivot) {
+                m_Front.pivot = pivot;
+            }
+
+            if (m_Front.anchorMin != attachment) {
+                m_Front.anchorMin = attachment;
+            }
+
+            if (m_Front.anchorMax != attachment) {
+                m_Front.anchorMax = attachment;
+            }
+
+            if (m_Front.rect.size != m_Rect.rect.size) {
+                SetSize(m_Front, m_Rect.rect.size);
+            }
+
+            float frontAngle = CurlAngle();
+
+            float maskAngle = m_CurrentDragArea switch {
+                EDragArea.BottomLeft or EDragArea.BottomRight => frontAngle * 0.5f,
+                EDragArea.TopLeft or EDragArea.TopRight => frontAngle * 0.5f + 180,
+                EDragArea.Left => -90,
+                EDragArea.Right => 90,
+                EDragArea.Top => 180,
+                _ => 0
+            };
+
+            Vector3 fold = (CardPosition(m_CurrentDragArea) + m_FrontPosition) * 0.5f;
+
+            // 先动遮罩，再补偿它的子物体；不能交换提交顺序。
+            SetCardPose(m_Mask, fold, maskAngle);
+            SetCardPose(m_Back, m_Rect.rect.center, 0);
+            SetCardPose(m_Front, m_FrontPosition, frontAngle);
+            SetCardPose(m_Shadow, fold, maskAngle + 90);
+            m_LastMatrix = m_Rect.localToWorldMatrix;
+            m_GeometryDirty = false;
+        }
+
+        private void SetCardPose(RectTransform target, Vector3 position, float angle) =>
+            target.SetPositionAndRotation(m_Rect.TransformPoint(position),
+                m_Rect.rotation * Quaternion.Euler(0, 0, angle));
+
+        private EDragArea HitArea(Vector3 point) {
+            Rect r = m_Rect.rect;
+
+            if (r.width <= 0 || r.height <= 0 || !r.Contains(point)) {
                 return EDragArea.None;
             }
 
-            if (hit == m_DragArea.bottomLeft.gameObject) {
+            Vector2 uv = ((Vector2)point - r.min) / r.size;
+            bool left = uv.x < k_HotspotSize, right = uv.x > 1 - k_HotspotSize;
+            bool bottom = uv.y < k_HotspotSize, top = uv.y > 1 - k_HotspotSize;
+
+            if (bottom && left) {
                 return EDragArea.BottomLeft;
             }
 
-            if (hit == m_DragArea.bottomRight.gameObject) {
+            if (bottom && right) {
                 return EDragArea.BottomRight;
             }
 
-            if (hit == m_DragArea.topLeft.gameObject) {
+            if (top && left) {
                 return EDragArea.TopLeft;
             }
 
-            if (hit == m_DragArea.topRight.gameObject) {
+            if (top && right) {
                 return EDragArea.TopRight;
             }
 
-            if (hit == m_DragArea.left.gameObject) {
+            if (left) {
                 return EDragArea.Left;
             }
 
-            if (hit == m_DragArea.right.gameObject) {
+            if (right) {
                 return EDragArea.Right;
             }
 
-            if (hit == m_DragArea.top.gameObject) {
+            if (top) {
                 return EDragArea.Top;
             }
 
-            if (hit == m_DragArea.bottom.gameObject) {
-                return EDragArea.Bottom;
-            }
-
-            return EDragArea.None;
+            return bottom ? EDragArea.Bottom : EDragArea.None;
         }
 
-        private bool PointerPosition(PointerEventData data, out Vector3 position) {
+        private bool PointerPosition(Vector2 screen, Camera camera, out Vector3 position) {
             position = default;
-            // 非等比父级叠加 X/Y 倾斜时，rotation * forward 不是实际平面法线。
-            // 从完整变换矩阵的两条切线构造平面，再将命中点转回牌局部空间。
             Vector3 origin = m_Rect.TransformPoint(Vector3.zero);
             Vector3 normal = Vector3.Cross(m_Rect.TransformVector(Vector3.right), m_Rect.TransformVector(Vector3.up));
 
@@ -526,9 +588,8 @@ namespace ZStudio.UniKit.UI {
                 return false;
             }
 
-            Camera camera = data.pressEventCamera;
-            Ray ray = camera ? camera.ScreenPointToRay(data.position)
-                : new Ray(new Vector3(data.position.x, data.position.y, -100), Vector3.forward);
+            var ray = camera ? camera.ScreenPointToRay(screen)
+                : new Ray(new Vector3(screen.x, screen.y, -100), Vector3.forward);
 
             if (!new Plane(normal, origin).Raycast(ray, out float distance)) {
                 return false;
@@ -539,32 +600,36 @@ namespace ZStudio.UniKit.UI {
             return true;
         }
 
-        public void OnPointerDown(PointerEventData eventData) {
-            if (!Initialize() || m_PointerId.HasValue || m_FlipTween.isAlive ||
-                eventData.button != PointerEventData.InputButton.Left
-                || (m_OnlyOnce && m_FlipCompletedCount > 0)) {
+        public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera) =>
+            m_Initialized && CanInteract && !m_PointerId.HasValue &&
+            PointerPosition(screenPoint, eventCamera, out var point) && HitArea(point) != EDragArea.None;
+
+        public void OnPointerDown(PointerEventData data) {
+            if (!Initialize() || !CanInteract || m_PointerId.HasValue
+                || data.button != PointerEventData.InputButton.Left ||
+                !PointerPosition(data.position, data.pressEventCamera, out var point)) {
                 return;
             }
 
-            EDragArea area = HitArea(eventData.pointerCurrentRaycast.gameObject
-                ? eventData.pointerCurrentRaycast.gameObject : eventData.pointerEnter);
+            EDragArea area = HitArea(point);
 
-            if (area == EDragArea.None || !PointerPosition(eventData, out var position)) {
+            if (area == EDragArea.None || !SelectArea(area)) {
                 return;
             }
 
-            StopAnimations();
-
-            if (!SelectArea(area)) {
-                return;
-            }
-
-            m_PointerId = eventData.pointerId;
-            m_BeginPointerPosition = position;
-            m_IsDragging = true;
+            m_State = State.Dragging;
+            m_PointerId = data.pointerId;
+            m_BeginPointerPosition = point;
         }
 
-        private Vector3 ConstrainDelta(Vector3 delta) {
+        public void OnDrag(PointerEventData data) {
+            if (m_State != State.Dragging || m_PointerId != data.pointerId ||
+                !PointerPosition(data.position, data.pressEventCamera, out var point)) {
+                return;
+            }
+
+            Vector3 delta = point - m_BeginPointerPosition;
+
             if (m_CurrentDragArea is EDragArea.Left or EDragArea.Right) {
                 delta.y = 0;
             }
@@ -574,11 +639,8 @@ namespace ZStudio.UniKit.UI {
             }
 
             delta.z = 0;
-            return IsValidDrag(delta) ? delta : Vector3.zero;
-        }
-
-        private bool IsValidDrag(Vector3 delta) =>
-            m_CurrentDragArea switch {
+            
+            bool valid = m_CurrentDragArea switch {
                 EDragArea.BottomLeft => delta.x >= 0 && delta.y >= 0,
                 EDragArea.BottomRight => delta.x <= 0 && delta.y >= 0,
                 EDragArea.TopLeft => delta.x >= 0 && delta.y <= 0,
@@ -586,70 +648,30 @@ namespace ZStudio.UniKit.UI {
                 EDragArea.Left => delta.x >= 0,
                 EDragArea.Right => delta.x <= 0,
                 EDragArea.Top => delta.y <= 0,
-                EDragArea.Bottom => delta.y >= 0,
-                _ => false
+                _ => delta.y >= 0
             };
-
-        public void OnDrag(PointerEventData eventData) {
-            if (!m_IsDragging || m_PointerId != eventData.pointerId || m_FlipTween.isAlive
-                || !PointerPosition(eventData, out var position)) {
-                return;
-            }
-
-            SetFrontPosition(m_BeginFrontPosition + ConstrainDelta(position - m_BeginPointerPosition));
+            
+            m_FrontPosition = m_BeginFrontPosition + (valid ? delta : Vector3.zero);
+            m_GeometryDirty = true;
         }
 
-        public void OnEndDrag(PointerEventData eventData) {
-            if (!m_IsDragging || m_PointerId != eventData.pointerId) {
+        public void OnEndDrag(PointerEventData data) {
+            if (m_State != State.Dragging || m_PointerId != data.pointerId) {
                 return;
             }
 
-            OnDrag(eventData);
-            m_IsDragging = false;
+            OnDrag(data);
             m_PointerId = null;
             float total = Vector3.Distance(m_BeginFrontPosition, GetFlipTargetPosition());
             float progress = total > 0.0001f ? Vector3.Distance(m_BeginFrontPosition, m_FrontPosition) / total : 0;
-
-            if (progress >= m_FlipThreshold) {
-                TriggerFlip();
-            } else {
-                m_RecoveryTween = MoveFront(m_BeginFrontPosition, m_RecoveryTime, m_RecoveryEase);
-            }
-        }
-
-        public void OnPointerUp(PointerEventData eventData) => OnEndDrag(eventData);
-
-        private Vector3 GetFlipTargetPosition() {
-            float angle = Mathf.Repeat(m_FrontAngle, 360);
-            EDragArea target = m_CurrentDragArea switch {
-                EDragArea.BottomLeft => angle < 270 ? EDragArea.BottomRight : EDragArea.TopLeft,
-                EDragArea.BottomRight => angle > 90 ? EDragArea.BottomLeft : EDragArea.TopRight,
-                EDragArea.TopLeft => angle > 90 ? EDragArea.TopRight : EDragArea.BottomLeft,
-                EDragArea.TopRight => angle < 270 ? EDragArea.TopLeft : EDragArea.BottomRight,
-                EDragArea.Left => EDragArea.Right,
-                EDragArea.Right => EDragArea.Left,
-                EDragArea.Top => EDragArea.Bottom,
-                EDragArea.Bottom => EDragArea.Top,
-                _ => EDragArea.None
-            };
-            return target == EDragArea.None ? m_BeginFrontPosition : CardPosition(GetAnchor(target));
-        }
-
-        private void TriggerFlip() {
-            if (m_FlipTween.isAlive || (m_OnlyOnce && m_FlipCompletedCount > 0)) {
-                return;
-            }
-
-            m_FlipTween = MoveFront(GetFlipTargetPosition(), m_FlipTime, m_FlipEase).OnComplete(OnFlipComplete);
-        }
-
-        private void OnFlipComplete() {
-            (m_ImgFront.sprite, m_ImgBack.sprite) = (m_ImgBack.sprite, m_ImgFront.sprite);
-            m_FlipCompletedCount++;
-            ResetGeometry();
             
-            // 最后通知，业务在回调内 Reset/换图时不会被旧动作再次覆盖。
-            onFlipComplete?.Invoke();
+            if (progress >= m_FlipThreshold) {
+                BeginFlip();
+            } else {
+                StartMotion(State.Returning, m_BeginFrontPosition, m_RecoveryTime, m_RecoveryEase);
+            }
         }
+
+        public void OnPointerUp(PointerEventData data) => OnEndDrag(data);
     }
 }

@@ -8,34 +8,20 @@ namespace ZStudio.UniKit.UI.Samples {
     public sealed class CurlDemo : MonoBehaviour {
         private Text m_Label;
         private int m_Completions;
-        
+
         [SerializeField]
         private CardCurl m_Card;
-        
+
         private void Awake() {
-            m_Card ??= FindFirstObjectByType<CardCurl>();
+            if (!m_Card) {
+                m_Card = FindFirstObjectByType<CardCurl>();
+            }
 
             if (!m_Card) {
                 return;
             }
 
             var canvas = m_Card.GetComponentInParent<Canvas>().rootCanvas;
-            var events = FindFirstObjectByType<EventSystem>();
-
-            if (events) {
-                Type input = Type.GetType("UnityEngine.InputSystem.UI.InputSystemUIInputModule, Unity.InputSystem");
-
-                if (input != null && !events.GetComponent(input)) {
-                    foreach (var oldModule in events.GetComponents<BaseInputModule>()) {
-                        oldModule.enabled = false;
-                        Destroy(oldModule);
-                    }
-
-                    var module = events.gameObject.AddComponent(input);
-                    input.GetMethod("AssignDefaultActions")?.Invoke(module, null);
-                }
-            }
-
             var panel = new GameObject("Rotation controls", typeof(RectTransform), typeof(Image));
             panel.transform.SetParent(canvas.transform, false);
 
