@@ -356,7 +356,7 @@ MonoBehaviour:
   m_StartingDragAreaTips: 0
   m_TipsEase: 3
   m_TipsTime: 0.5
-  m_TipsOffset: 120
+  m_TipsRatio: 0.15
   m_Mask: {fileID: 6696078200704922066}
   m_Back: {fileID: 3988091479086590638}
   m_Front: {fileID: 5820108867960484004}

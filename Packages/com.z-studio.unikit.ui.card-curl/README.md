@@ -15,16 +15,15 @@ Unity 6、UGUI 2.0。核心包不依赖 URP、RenderTexture 或第三方 Tween�
 using ZStudio.UniKit.UI;
 
 // CardCurl 组件引用由 Inspector 绑定。
-card.SetBackImage(backSprite);
-card.SetFrontImage(faceSprite);
+card.SetImages(faceSprite, backSprite);
 card.onFlipComplete.AddListener(OnVisualFlipCompleted);
 
-card.Flip(CardCurl.EDragArea.BottomRight);
+card.Flip(CardCurl.DragArea.BottomRight);
 card.Reset();
-card.ShowDragTips(CardCurl.EDragArea.BottomLeft);
+card.ShowDragTips(CardCurl.DragArea.BottomLeft);
 ```
 
-`SetFrontImage`、`SetBackImage` 和 `Reset` 会停止当前动画、清除指针并重新盖牌；同时换两面时可用 `SetImages(front, back)`。它们不会改变根节点尺寸和锚点，正反面统一使用根节点尺寸。`Flip` 播放指定方向的翻牌；`ShowDragTips` 使用传入方向，Tips Offset 始终是牌根节点的本地 UI 单位，不随 Canvas 模式改变。`Only Once` 默认开启，完成后需要 Reset 才能再次交互。完成事件在旧动作结束和终态写入之后派发，回调内可以立即 Reset 或换图。
+`SetFrontImage`、`SetBackImage` 和 `Reset` 会停止当前动画、清除指针并重新盖牌；同时换两面时可用 `SetImages(front, back)`。它们不会改变根节点尺寸和锚点，正反面统一使用根节点尺寸。`Flip` 播放指定方向的翻牌；`ShowDragTips` 使用传入方向。Tips Ratio 为该方向跨度的比例：四角按对角线、四边按宽或高计算，默认 0.15，上限 0.25；设为 0 时不播放提示。`Only Once` 默认开启，完成后需要 Reset 才能再次交互。完成事件在旧动作结束和终态写入之后派发，回调内可以立即 Reset 或换图。
 
 拖动只有一个捕获指针。轻触松手同样释放捕获，第二根手指不会改动第一根手指的状态。回弹、提示和翻牌均插值根节点局部位置，使用 unscaledDeltaTime；修改父节点位置、旋转或缩放不会把动画终点留在旧世界位置。
 
@@ -45,12 +44,22 @@ Inspector 会显示具体缺失引用、组件或内部层级错误。编辑器�
 
 遮罩仍采用原版二维折页效果。旋转到完全侧向、投影面积为零或父级缩放为零时不能进行有效指针投影。
 
-## Demo 与验证
+## 动作结果与交互状态
 
-菜单 **Tools → UniKit → UI Card Curl → Open Demo**，或通过 Package Manager 导入 Demo 并打开 `Demo.unity`。沿用参考 Demo 的牌面和初始旋转，顶部补充 ±30°、归零、Reset、Hint 和八方向翻牌按钮。Demo 适配现有 Input System 或旧输入模块，核心不依赖 Input System。
+`Flip` / `ShowDragTips` 保留 void 签名，可绑定 UnityEvent。代码需要确认动作是否启动时，使用 `TryFlip(area)` / `TryShowDragTips(area)`：返回 true 表示已启动，false 表示方向无效、组件不可用或当前状态不接受该动作；提示幅度为零时也返回 false。失败不会中断已有动作。
 
-包名为 `com.z-studio.unikit.ui.card-curl`；完整组件类型为 `ZStudio.UniKit.UI.CardCurl`。已导入示例位于 `Assets/Samples/UI Card Curl/Demo`。
+- `IsBusy`：正在拖动、回弹、提示或翻牌。
+- `IsInteractable`：当前可以接受指针交互。提示和回弹允许被新的拖动打断，所以 IsBusy 与 IsInteractable 可以同时为 true；提示方法在拖动中返回 false。
+- `FlipCompletedCount`：自上次 Reset 或换图以来完成的翻牌次数。
 
-`Tests/PlayMode` 检查八方向在多个旋转角度、父级旋转/非等比缩放下的局部几何一致性，覆盖拖动中旋转、回弹、翻牌、Reset 重入、轻触释放、第二指针、正交/透视相机和 X/Y 倾斜。外部项目通过 manifest 的 `testables` 加入包名后运行。
+Flip Threshold 为 0 时，允许在四角或四边热点轻触松手翻牌，中心区域仍不响应；大于 0 时要求达到对应拖动进度。Only Once、指针捕获和完成事件规则与拖动翻牌相同。
 
-验证记录见 [ImplementationNotes](Docs/ImplementationNotes.md)。这次替换只针对本包；桌面 CurlEffect 参考文件保持原样。
+## Demo
+
+当前开发阶段直接打开包内 `Samples/Demo/Demo.unity`，无需导入到 Assets。示例脚本会随工程编译，接下来的示例修改以该目录为准。
+
+示例场景使用 Input System UI 模块和 URP 相机附加组件，需要项目安装 Input System 与 URP，并启用 Input System 输入后端。核心组件只依赖 UGUI；其他渲染管线或旧输入项目可将预制体放入现有 Canvas，使用项目自己的相机、EventSystem 和输入模块。
+
+顶部控制面板通过布局组件适配 Canvas 宽度，提供旋转、Reset、Hint、八方向翻牌及状态显示。Reset 恢复牌背、0° 和示例累计完成次数；Hint 与方向按钮先盖牌再演示，保留角度并允许反复使用。Busy 表示动作正在进行，Reset to replay 表示 Only Once 已完成。禁用 Demo 隐藏面板并解除事件订阅；销毁 Demo 同时清理面板。
+
+本包未附带自动化测试程序集。接入后应在目标 Canvas、输入后端和渲染管线中检查八方向拖动、旋转、回弹、提示、Reset、阈值为零的点击翻牌以及多指输入。

@@ -48,6 +48,7 @@ namespace ZStudio.UniKit.UI {
         private float m_RecoveryTime = 0.25f;
 
         [Header("翻页设置")]
+        [Tooltip("松手时达到此进度则翻牌；设为 0 时允许轻触翻牌。")]
         [SerializeField, Range(0, 1)]
         private float m_FlipThreshold = 0.5f;
 
@@ -70,9 +71,9 @@ namespace ZStudio.UniKit.UI {
         [SerializeField, Min(0.001f)]
         private float m_TipsTime = 0.5f;
 
-        [Tooltip("提示移动距离，单位为牌根节点的本地 UI 单位，与 Canvas 模式无关。")]
-        [SerializeField, Min(0)]
-        private float m_TipsOffset = 80f;
+        [Tooltip("提示距离占当前方向跨度的比例，随牌尺寸变化；最大为跨度的四分之一。")]
+        [SerializeField, Range(0, 0.25f)]
+        private float m_TipsRatio = 0.15f;
 
         [Header("UI组件引用")]
         [SerializeField]
@@ -87,7 +88,16 @@ namespace ZStudio.UniKit.UI {
         [SerializeField]
         private RectTransform m_Shadow;
 
-        public UnityEvent onFlipComplete;
+        public UnityEvent onFlipComplete = new();
+
+        /// <summary>正在拖动、回弹、提示或翻牌。</summary>
+        public bool IsBusy => m_State != State.Idle;
+
+        /// <summary>可接收新的交互；提示与回弹允许被打断。</summary>
+        public bool IsInteractable => m_Initialized && CanInteract;
+
+        /// <summary>自上次 Reset 或换图以来完成的翻牌次数。</summary>
+        public int FlipCompletedCount { get; private set; }
 
         // 与原预制体一致：四角各占宽高的 30%，中间四条边承接整边拖动。
         private const float k_HotspotSize = 0.3f;
@@ -98,7 +108,6 @@ namespace ZStudio.UniKit.UI {
         private Motion m_Motion;
         private Vector3 m_FrontPosition, m_BeginFrontPosition, m_BeginPointerPosition;
         private int? m_PointerId;
-        private int m_FlipCompletedCount;
         private bool m_Initialized, m_GeometryDirty;
         private volatile bool m_ConfigurationDirty = true;
         private Rect m_LastRect;
@@ -110,7 +119,7 @@ namespace ZStudio.UniKit.UI {
         private void OnEnable() => m_GeometryDirty = true;
 
         private void Start() {
-            if (Initialize() && m_State == State.Idle && m_FlipCompletedCount == 0) {
+            if (Initialize() && m_State == State.Idle && FlipCompletedCount == 0) {
                 ShowDragTips(m_StartingDragAreaTips);
             }
         }
@@ -120,7 +129,7 @@ namespace ZStudio.UniKit.UI {
             m_RecoveryTime = Mathf.Max(0.001f, m_RecoveryTime);
             m_FlipTime = Mathf.Max(0.001f, m_FlipTime);
             m_TipsTime = Mathf.Max(0.001f, m_TipsTime);
-            m_TipsOffset = Mathf.Max(0, m_TipsOffset);
+            m_TipsRatio = Mathf.Clamp(m_TipsRatio, 0, 0.25f);
             m_FlipThreshold = Mathf.Clamp01(m_FlipThreshold);
             m_ConfigurationDirty = true;
         }
@@ -161,7 +170,7 @@ namespace ZStudio.UniKit.UI {
                 m_ConfigurationDirty = false;
                 m_Initialized = false;
                 CancelInteraction();
-                m_FlipCompletedCount = 0;
+                FlipCompletedCount = 0;
             }
 
             if (m_Initialized) {
@@ -226,7 +235,7 @@ namespace ZStudio.UniKit.UI {
             }
 
             CancelInteraction();
-            m_FlipCompletedCount = 0;
+            FlipCompletedCount = 0;
             ApplyImages();
 
             if (m_Rect.rect != m_LastRect) {
@@ -279,7 +288,7 @@ namespace ZStudio.UniKit.UI {
         }
 
         private bool CanInteract =>
-            isActiveAndEnabled && !(m_OnlyOnce && m_FlipCompletedCount > 0) &&
+            isActiveAndEnabled && !(m_OnlyOnce && FlipCompletedCount > 0) &&
             m_State != State.PreparingFlip && m_State != State.Flipping;
 
         private Vector3 CardPosition(DragArea area) {
@@ -319,23 +328,34 @@ namespace ZStudio.UniKit.UI {
             return true;
         }
 
-        public void ShowDragTips(DragArea dragArea) {
-            if (!Initialize() || !CanInteract || m_State == State.Dragging) {
-                return;
+        public void ShowDragTips(DragArea dragArea) => TryShowDragTips(dragArea);
+
+        /// <summary>无效方向、不可交互、正在拖动或提示幅度为零时返回 false。</summary>
+        public bool TryShowDragTips(DragArea dragArea) {
+            if (!Initialize() || !CanInteract || m_State == State.Dragging ||
+                dragArea is < DragArea.BottomLeft or > DragArea.Bottom) {
+                return false;
             }
 
-            if (!SelectArea(dragArea)) {
-                return;
+            Vector3 span = CardPosition(Opposite(dragArea)) - CardPosition(dragArea);
+            float ratio = Mathf.Clamp(m_TipsRatio, 0, 0.25f);
+
+            if (ratio <= 0 || span.sqrMagnitude <= 0.0001f) {
+                return false;
             }
 
-            Vector3 direction = (CardPosition(Opposite(dragArea)) - m_BeginFrontPosition).normalized;
-            StartMotion(State.Hinting, m_BeginFrontPosition + direction * m_TipsOffset,
+            SelectArea(dragArea);
+            StartMotion(State.Hinting, m_BeginFrontPosition + span * ratio,
                 m_TipsTime, m_TipsEase, 4);
+            return true;
         }
 
-        public void Flip(DragArea dragArea) {
+        public void Flip(DragArea dragArea) => TryFlip(dragArea);
+
+        /// <summary>无效方向、Only Once 已完成、已禁用或正在翻牌时返回 false。</summary>
+        public bool TryFlip(DragArea dragArea) {
             if (!Initialize() || !CanInteract || !SelectArea(dragArea)) {
-                return;
+                return false;
             }
 
             m_PointerId = null;
@@ -349,6 +369,7 @@ namespace ZStudio.UniKit.UI {
 
             StartMotion(State.PreparingFlip, Vector3.Lerp(m_BeginFrontPosition, destination, m_FlipThreshold),
                 m_FlipTime, m_FlipEase);
+            return true;
         }
 
         private struct Motion {
@@ -427,7 +448,7 @@ namespace ZStudio.UniKit.UI {
 
                         if (completed) {
                             (m_ImgFront.sprite, m_ImgBack.sprite) = (m_ImgBack.sprite, m_ImgFront.sprite);
-                            m_FlipCompletedCount++;
+                            FlipCompletedCount++;
                         }
 
                         ResetGeometry();
@@ -639,7 +660,7 @@ namespace ZStudio.UniKit.UI {
             }
 
             delta.z = 0;
-            
+
             bool valid = m_CurrentDragArea switch {
                 DragArea.BottomLeft => delta.x >= 0 && delta.y >= 0,
                 DragArea.BottomRight => delta.x <= 0 && delta.y >= 0,
@@ -650,7 +671,7 @@ namespace ZStudio.UniKit.UI {
                 DragArea.Top => delta.y <= 0,
                 _ => delta.y >= 0
             };
-            
+
             m_FrontPosition = m_BeginFrontPosition + (valid ? delta : Vector3.zero);
             m_GeometryDirty = true;
         }
@@ -664,7 +685,8 @@ namespace ZStudio.UniKit.UI {
             m_PointerId = null;
             float total = Vector3.Distance(m_BeginFrontPosition, GetFlipTargetPosition());
             float progress = total > 0.0001f ? Vector3.Distance(m_BeginFrontPosition, m_FrontPosition) / total : 0;
-            
+
+            // 阈值为零时，合法热点上的轻触松手也算一次翻牌。
             if (progress >= m_FlipThreshold) {
                 BeginFlip();
             } else {
