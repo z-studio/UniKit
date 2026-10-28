@@ -1,6 +1,4 @@
-using System;
 using UnityEngine;
-using UnityEngine.EventSystems;
 using UnityEngine.UI;
 
 namespace ZStudio.UniKit.UI.Samples {
@@ -44,10 +42,10 @@ namespace ZStudio.UniKit.UI.Samples {
                 RefreshLabel();
             });
             Button(rect, "Reset", 130, -65, m_Card.Reset);
-            Button(rect, "Hint", 260, -65, () => m_Card.ShowDragTips(CardCurl.EDragArea.BottomLeft));
+            Button(rect, "Hint", 260, -65, () => m_Card.ShowDragTips(CardCurl.DragArea.BottomLeft));
 
             for (var i = 0; i < 8; i++) {
-                var area = (CardCurl.EDragArea)(i + 1);
+                var area = (CardCurl.DragArea)(i + 1);
                 Button(rect, new[] { "BL", "BR", "TL", "TR", "Left", "Right", "Top", "Bottom" }[i], -322 + i * 92, -125,
                     () => {
                         m_Card.Reset();

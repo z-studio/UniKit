@@ -12,7 +12,7 @@ namespace ZStudio.UniKit.UI {
     [RequireComponent(typeof(RectTransform), typeof(Image))]
     public class CardCurl : MonoBehaviour, IDragHandler, IEndDragHandler, IPointerDownHandler,
         IPointerUpHandler, ICanvasRaycastFilter {
-        public enum EDragArea {
+        public enum DragArea {
             None,
             BottomLeft,
             BottomRight,
@@ -62,7 +62,7 @@ namespace ZStudio.UniKit.UI {
 
         [Header("提示设置")]
         [SerializeField]
-        private EDragArea m_StartingDragAreaTips;
+        private DragArea m_StartingDragAreaTips;
 
         [SerializeField]
         private CurlEase m_TipsEase = CurlEase.OutSine;
@@ -94,7 +94,7 @@ namespace ZStudio.UniKit.UI {
         private RectTransform m_Rect;
         private Image m_ImgRoot, m_ImgBack, m_ImgFront;
         private State m_State;
-        private EDragArea m_CurrentDragArea;
+        private DragArea m_CurrentDragArea;
         private Motion m_Motion;
         private Vector3 m_FrontPosition, m_BeginFrontPosition, m_BeginPointerPosition;
         private int? m_PointerId;
@@ -274,7 +274,7 @@ namespace ZStudio.UniKit.UI {
         }
 
         private void ResetGeometry() {
-            SelectArea(EDragArea.BottomLeft);
+            SelectArea(DragArea.BottomLeft);
             m_State = State.Idle;
         }
 
@@ -282,34 +282,34 @@ namespace ZStudio.UniKit.UI {
             isActiveAndEnabled && !(m_OnlyOnce && m_FlipCompletedCount > 0) &&
             m_State != State.PreparingFlip && m_State != State.Flipping;
 
-        private Vector3 CardPosition(EDragArea area) {
+        private Vector3 CardPosition(DragArea area) {
             Rect r = m_Rect.rect;
             return area switch {
-                EDragArea.BottomLeft => new Vector3(r.xMin, r.yMin),
-                EDragArea.BottomRight => new Vector3(r.xMax, r.yMin),
-                EDragArea.TopLeft => new Vector3(r.xMin, r.yMax),
-                EDragArea.TopRight => new Vector3(r.xMax, r.yMax),
-                EDragArea.Left => new Vector3(r.xMin, r.center.y),
-                EDragArea.Right => new Vector3(r.xMax, r.center.y),
-                EDragArea.Top => new Vector3(r.center.x, r.yMax),
+                DragArea.BottomLeft => new Vector3(r.xMin, r.yMin),
+                DragArea.BottomRight => new Vector3(r.xMax, r.yMin),
+                DragArea.TopLeft => new Vector3(r.xMin, r.yMax),
+                DragArea.TopRight => new Vector3(r.xMax, r.yMax),
+                DragArea.Left => new Vector3(r.xMin, r.center.y),
+                DragArea.Right => new Vector3(r.xMax, r.center.y),
+                DragArea.Top => new Vector3(r.center.x, r.yMax),
                 _ => new Vector3(r.center.x, r.yMin)
             };
         }
 
-        private static EDragArea Opposite(EDragArea area) =>
+        private static DragArea Opposite(DragArea area) =>
             area switch {
-                EDragArea.BottomLeft => EDragArea.TopRight,
-                EDragArea.BottomRight => EDragArea.TopLeft,
-                EDragArea.TopLeft => EDragArea.BottomRight,
-                EDragArea.TopRight => EDragArea.BottomLeft,
-                EDragArea.Left => EDragArea.Right,
-                EDragArea.Right => EDragArea.Left,
-                EDragArea.Top => EDragArea.Bottom,
-                _ => EDragArea.Top
+                DragArea.BottomLeft => DragArea.TopRight,
+                DragArea.BottomRight => DragArea.TopLeft,
+                DragArea.TopLeft => DragArea.BottomRight,
+                DragArea.TopRight => DragArea.BottomLeft,
+                DragArea.Left => DragArea.Right,
+                DragArea.Right => DragArea.Left,
+                DragArea.Top => DragArea.Bottom,
+                _ => DragArea.Top
             };
 
-        private bool SelectArea(EDragArea area) {
-            if (area is < EDragArea.BottomLeft or > EDragArea.Bottom) {
+        private bool SelectArea(DragArea area) {
+            if (area is < DragArea.BottomLeft or > DragArea.Bottom) {
                 return false;
             }
 
@@ -319,7 +319,7 @@ namespace ZStudio.UniKit.UI {
             return true;
         }
 
-        public void ShowDragTips(EDragArea dragArea) {
+        public void ShowDragTips(DragArea dragArea) {
             if (!Initialize() || !CanInteract || m_State == State.Dragging) {
                 return;
             }
@@ -333,7 +333,7 @@ namespace ZStudio.UniKit.UI {
                 m_TipsTime, m_TipsEase, 4);
         }
 
-        public void Flip(EDragArea dragArea) {
+        public void Flip(DragArea dragArea) {
             if (!Initialize() || !CanInteract || !SelectArea(dragArea)) {
                 return;
             }
@@ -342,8 +342,8 @@ namespace ZStudio.UniKit.UI {
             Rect r = m_Rect.rect;
 
             Vector3 destination = dragArea switch {
-                EDragArea.BottomLeft or EDragArea.BottomRight => new Vector3(r.center.x, r.yMax),
-                EDragArea.TopLeft or EDragArea.TopRight => new Vector3(r.center.x, r.yMin),
+                DragArea.BottomLeft or DragArea.BottomRight => new Vector3(r.center.x, r.yMax),
+                DragArea.TopLeft or DragArea.TopRight => new Vector3(r.center.x, r.yMin),
                 _ => CardPosition(Opposite(dragArea))
             };
 
@@ -457,10 +457,10 @@ namespace ZStudio.UniKit.UI {
             float theta = Mathf.Atan2(delta.y, delta.x) * Mathf.Rad2Deg;
 
             return m_CurrentDragArea switch {
-                EDragArea.BottomLeft when theta is > 0 and < 90 => (theta - 90) * 2,
-                EDragArea.BottomRight when theta is > 90 and < 180 => (theta - 90) * 2,
-                EDragArea.TopLeft when theta is > -90 and < 0 => (theta + 90) * 2,
-                EDragArea.TopRight when theta is > -180 and < -90 => (theta + 90) * 2,
+                DragArea.BottomLeft when theta is > 0 and < 90 => (theta - 90) * 2,
+                DragArea.BottomRight when theta is > 90 and < 180 => (theta - 90) * 2,
+                DragArea.TopLeft when theta is > -90 and < 0 => (theta + 90) * 2,
+                DragArea.TopRight when theta is > -180 and < -90 => (theta + 90) * 2,
                 _ => 0
             };
         }
@@ -469,10 +469,10 @@ namespace ZStudio.UniKit.UI {
             float angle = Mathf.Repeat(CurlAngle(), 360);
 
             var target = m_CurrentDragArea switch {
-                EDragArea.BottomLeft => angle < 270 ? EDragArea.BottomRight : EDragArea.TopLeft,
-                EDragArea.BottomRight => angle > 90 ? EDragArea.BottomLeft : EDragArea.TopRight,
-                EDragArea.TopLeft => angle > 90 ? EDragArea.TopRight : EDragArea.BottomLeft,
-                EDragArea.TopRight => angle < 270 ? EDragArea.TopLeft : EDragArea.BottomRight,
+                DragArea.BottomLeft => angle < 270 ? DragArea.BottomRight : DragArea.TopLeft,
+                DragArea.BottomRight => angle > 90 ? DragArea.BottomLeft : DragArea.TopRight,
+                DragArea.TopLeft => angle > 90 ? DragArea.TopRight : DragArea.BottomLeft,
+                DragArea.TopRight => angle < 270 ? DragArea.TopLeft : DragArea.BottomRight,
                 _ => Opposite(m_CurrentDragArea)
             };
 
@@ -483,13 +483,13 @@ namespace ZStudio.UniKit.UI {
 
         private void CommitGeometry() {
             var pivot = m_CurrentDragArea switch {
-                EDragArea.BottomLeft => new Vector2(0, 1),
-                EDragArea.BottomRight => Vector2.one,
-                EDragArea.TopLeft => Vector2.zero,
-                EDragArea.TopRight => new Vector2(1, 0),
-                EDragArea.Left => new Vector2(1, 0.5f),
-                EDragArea.Right => new Vector2(0, 0.5f),
-                EDragArea.Top => new Vector2(0.5f, 0),
+                DragArea.BottomLeft => new Vector2(0, 1),
+                DragArea.BottomRight => Vector2.one,
+                DragArea.TopLeft => Vector2.zero,
+                DragArea.TopRight => new Vector2(1, 0),
+                DragArea.Left => new Vector2(1, 0.5f),
+                DragArea.Right => new Vector2(0, 0.5f),
+                DragArea.Top => new Vector2(0.5f, 0),
                 _ => new Vector2(0.5f, 1)
             };
 
@@ -514,11 +514,11 @@ namespace ZStudio.UniKit.UI {
             float frontAngle = CurlAngle();
 
             float maskAngle = m_CurrentDragArea switch {
-                EDragArea.BottomLeft or EDragArea.BottomRight => frontAngle * 0.5f,
-                EDragArea.TopLeft or EDragArea.TopRight => frontAngle * 0.5f + 180,
-                EDragArea.Left => -90,
-                EDragArea.Right => 90,
-                EDragArea.Top => 180,
+                DragArea.BottomLeft or DragArea.BottomRight => frontAngle * 0.5f,
+                DragArea.TopLeft or DragArea.TopRight => frontAngle * 0.5f + 180,
+                DragArea.Left => -90,
+                DragArea.Right => 90,
+                DragArea.Top => 180,
                 _ => 0
             };
 
@@ -537,11 +537,11 @@ namespace ZStudio.UniKit.UI {
             target.SetPositionAndRotation(m_Rect.TransformPoint(position),
                 m_Rect.rotation * Quaternion.Euler(0, 0, angle));
 
-        private EDragArea HitArea(Vector3 point) {
+        private DragArea HitArea(Vector3 point) {
             Rect r = m_Rect.rect;
 
             if (r.width <= 0 || r.height <= 0 || !r.Contains(point)) {
-                return EDragArea.None;
+                return DragArea.None;
             }
 
             Vector2 uv = ((Vector2)point - r.min) / r.size;
@@ -549,34 +549,34 @@ namespace ZStudio.UniKit.UI {
             bool bottom = uv.y < k_HotspotSize, top = uv.y > 1 - k_HotspotSize;
 
             if (bottom && left) {
-                return EDragArea.BottomLeft;
+                return DragArea.BottomLeft;
             }
 
             if (bottom && right) {
-                return EDragArea.BottomRight;
+                return DragArea.BottomRight;
             }
 
             if (top && left) {
-                return EDragArea.TopLeft;
+                return DragArea.TopLeft;
             }
 
             if (top && right) {
-                return EDragArea.TopRight;
+                return DragArea.TopRight;
             }
 
             if (left) {
-                return EDragArea.Left;
+                return DragArea.Left;
             }
 
             if (right) {
-                return EDragArea.Right;
+                return DragArea.Right;
             }
 
             if (top) {
-                return EDragArea.Top;
+                return DragArea.Top;
             }
 
-            return bottom ? EDragArea.Bottom : EDragArea.None;
+            return bottom ? DragArea.Bottom : DragArea.None;
         }
 
         private bool PointerPosition(Vector2 screen, Camera camera, out Vector3 position) {
@@ -602,7 +602,7 @@ namespace ZStudio.UniKit.UI {
 
         public bool IsRaycastLocationValid(Vector2 screenPoint, Camera eventCamera) =>
             m_Initialized && CanInteract && !m_PointerId.HasValue &&
-            PointerPosition(screenPoint, eventCamera, out var point) && HitArea(point) != EDragArea.None;
+            PointerPosition(screenPoint, eventCamera, out var point) && HitArea(point) != DragArea.None;
 
         public void OnPointerDown(PointerEventData data) {
             if (!Initialize() || !CanInteract || m_PointerId.HasValue
@@ -611,9 +611,9 @@ namespace ZStudio.UniKit.UI {
                 return;
             }
 
-            EDragArea area = HitArea(point);
+            DragArea area = HitArea(point);
 
-            if (area == EDragArea.None || !SelectArea(area)) {
+            if (area == DragArea.None || !SelectArea(area)) {
                 return;
             }
 
@@ -630,24 +630,24 @@ namespace ZStudio.UniKit.UI {
 
             Vector3 delta = point - m_BeginPointerPosition;
 
-            if (m_CurrentDragArea is EDragArea.Left or EDragArea.Right) {
+            if (m_CurrentDragArea is DragArea.Left or DragArea.Right) {
                 delta.y = 0;
             }
 
-            if (m_CurrentDragArea is EDragArea.Top or EDragArea.Bottom) {
+            if (m_CurrentDragArea is DragArea.Top or DragArea.Bottom) {
                 delta.x = 0;
             }
 
             delta.z = 0;
             
             bool valid = m_CurrentDragArea switch {
-                EDragArea.BottomLeft => delta.x >= 0 && delta.y >= 0,
-                EDragArea.BottomRight => delta.x <= 0 && delta.y >= 0,
-                EDragArea.TopLeft => delta.x >= 0 && delta.y <= 0,
-                EDragArea.TopRight => delta.x <= 0 && delta.y <= 0,
-                EDragArea.Left => delta.x >= 0,
-                EDragArea.Right => delta.x <= 0,
-                EDragArea.Top => delta.y <= 0,
+                DragArea.BottomLeft => delta.x >= 0 && delta.y >= 0,
+                DragArea.BottomRight => delta.x <= 0 && delta.y >= 0,
+                DragArea.TopLeft => delta.x >= 0 && delta.y <= 0,
+                DragArea.TopRight => delta.x <= 0 && delta.y <= 0,
+                DragArea.Left => delta.x >= 0,
+                DragArea.Right => delta.x <= 0,
+                DragArea.Top => delta.y <= 0,
                 _ => delta.y >= 0
             };
             
