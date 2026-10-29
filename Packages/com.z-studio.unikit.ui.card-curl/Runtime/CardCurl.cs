@@ -90,6 +90,9 @@ namespace ZStudio.UniKit.UI {
 
         public UnityEvent onFlipComplete = new();
 
+        [Tooltip("未翻开并完成回弹复原后触发。主动 Reset、提示结束或被打断的回弹不触发。")]
+        public UnityEvent onRecoveryComplete = new();
+
         /// <summary>正在拖动、回弹、提示或翻牌。</summary>
         public bool IsBusy => m_State != State.Idle;
 
@@ -437,7 +440,8 @@ namespace ZStudio.UniKit.UI {
                 }
             }
 
-            bool completed = false;
+            var completed = false;
+            var recovered = false;
 
             if (m_State is State.Returning or State.Hinting or State.PreparingFlip or State.Flipping) {
                 if (AdvanceMotion(Time.unscaledDeltaTime)) {
@@ -445,6 +449,7 @@ namespace ZStudio.UniKit.UI {
                         BeginFlip();
                     } else {
                         completed = m_State == State.Flipping;
+                        recovered = m_State == State.Returning;
 
                         if (completed) {
                             (m_ImgFront.sprite, m_ImgBack.sprite) = (m_ImgBack.sprite, m_ImgFront.sprite);
@@ -463,6 +468,8 @@ namespace ZStudio.UniKit.UI {
             // 状态与画面先完成，再允许业务在回调内 Reset、换图或销毁物体。
             if (completed) {
                 onFlipComplete?.Invoke();
+            } else if (recovered) {
+                onRecoveryComplete?.Invoke();
             }
         }
 
@@ -514,7 +521,7 @@ namespace ZStudio.UniKit.UI {
                 _ => new Vector2(0.5f, 1)
             };
 
-            Vector2 attachment = Vector2.one - pivot;
+            var attachment = Vector2.one - pivot;
 
             if (m_Front.pivot != pivot) {
                 m_Front.pivot = pivot;

@@ -364,6 +364,9 @@ MonoBehaviour:
   onFlipComplete:
     m_PersistentCalls:
       m_Calls: []
+  onRecoveryComplete:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!1 &9121982057558424711
 GameObject:
   m_ObjectHideFlags: 0

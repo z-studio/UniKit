@@ -1,6 +1,6 @@
 # UI Card Curl
 
-`CardCurl` 是一个用于 Unity UI 的咪牌组件。玩家可以拖动牌的四角或四边，松手后根据拖动进度翻开或回弹。组件也提供自动翻牌、操作提示和翻牌完成事件。
+`CardCurl` 是一个用于 Unity UI 的咪牌组件。玩家可以拖动牌的四角或四边，松手后根据拖动进度翻开或回弹。组件也提供自动翻牌、操作提示，以及翻牌完成和回弹复原完成事件。
 
 ## 先运行示例
 
@@ -47,6 +47,7 @@ Hint 和自动翻牌按钮会先重置牌，方便重复体验。它们的方向
 | Tips Ratio | 提示距离占该方向跨度的比例，默认 0.15，范围 0～0.25；0 表示不播放提示 |
 | Tips Time / Tips Ease | 提示每段运动的时长和缓动方式 |
 | On Flip Complete | 翻牌完成时触发的事件 |
+| On Recovery Complete | 未达到翻牌阈值、回弹并完全复原后触发的事件，可用于播放音效等处理 |
 
 **希望点击就翻牌时，将 Flip Threshold 设为 0。** 点击仍需落在四角或四边，中心区域不响应。
 
@@ -72,11 +73,13 @@ public sealed class CardCurlExample : MonoBehaviour {
 
     private void OnEnable() {
         card.onFlipComplete.AddListener(OnFlipCompleted);
+        card.onRecoveryComplete.AddListener(OnRecoveryCompleted);
     }
 
     private void OnDisable() {
         if (card) {
             card.onFlipComplete.RemoveListener(OnFlipCompleted);
+            card.onRecoveryComplete.RemoveListener(OnRecoveryCompleted);
         }
     }
 
@@ -97,12 +100,24 @@ public sealed class CardCurlExample : MonoBehaviour {
     private void OnFlipCompleted() {
         Debug.Log("牌已翻开，可以在这里处理后续业务。", card);
     }
+
+    private void OnRecoveryCompleted() {
+        Debug.Log("本次未翻开，牌已复原，可以在这里播放回弹音效。", card);
+    }
 }
 ```
 
 这三个方法由不同按钮触发。不要在同一帧依次调用“翻牌 → 重置 → 提示”，因为重置会停止刚启动的翻牌。
 
 `DragArea` 表示牌自身的四角或四边，随牌一起旋转。例如 `DragArea.Left` 始终指牌本地坐标中的左边。调用 `Flip`、`TryFlip`、`ShowDragTips` 和 `TryShowDragTips` 时，都使用这个方向约定。
+
+### 处理翻牌与复原结果
+
+在 Inspector 的 **On Flip Complete** 中绑定翻开后的处理，在 **On Recovery Complete** 中绑定未翻开、回弹复原后的处理。例如可将后者绑定到场景中 AudioSource 的播放方法。
+
+`onRecoveryComplete` 在回弹动画结束、组件恢复空闲且画面已经复原后触发，每次完整回弹只通知一次。Flip Threshold 大于 0 时，在有效边角仅按下再松手也会走回弹流程；阈值为 0 时则按点击翻牌规则处理。
+
+主动调用 Reset 或换图、禁用组件、尺寸变化导致操作取消，以及回弹被新的拖动、提示或翻牌打断，都不会触发复原完成事件。提示动画结束也不会触发。两个完成事件的回调内都可以立即重置、换图、发起下一次动作或销毁物体。
 
 ### 换牌与查询状态
 
